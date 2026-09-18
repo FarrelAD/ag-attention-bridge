@@ -117,6 +117,7 @@ def main() -> int:
 
     # System tray icon
     def on_open_pending():
+        server.poll_active_interactions()
         if modal.isVisible():
             modal.raise_()
             modal.activateWindow()
@@ -124,6 +125,7 @@ def main() -> int:
             present_active()
 
     def on_toggle_current():
+        server.poll_active_interactions()
         if modal.isVisible():
             modal.hide_to_tray()
         else:
@@ -157,6 +159,7 @@ def main() -> int:
             modal.badge_count.setText(f"1 of {queue.count()}")
 
     server.request_received.connect(on_request_received)
+    server.start_background_poller(interval_ms=2000)
 
     # Process watcher: auto-shutdown when Antigravity IDE is closed
     import argparse

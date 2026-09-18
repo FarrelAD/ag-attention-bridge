@@ -213,6 +213,7 @@ QLabel#PermissionActionBadge {{
     border: 1px solid #9f1239;
     border-radius: 6px;
     padding: 3px 8px;
+    max-height: 24px;
     font-size: 11px;
     font-weight: bold;
 }}
@@ -241,6 +242,14 @@ QFrame#FooterFrame {{
     border-top: 1px solid {COLOR_BORDER};
     border-bottom-left-radius: 13px;
     border-bottom-right-radius: 13px;
+}}
+
+QFrame#FooterFrame QPushButton {{
+    padding: 6px 11px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 7px;
+    min-height: 22px;
 }}
 
 QPushButton {{
@@ -274,6 +283,22 @@ QPushButton#BtnDeny {{
 
 QPushButton#BtnDeny:hover {{
     background-color: {COLOR_DANGER_HOVER};
+}}
+
+QPushButton#BtnAllowConversation, QPushButton#BtnAllowGlobal {{
+    background-color: #1e3a5f;
+    color: #93c5fd;
+    border: 1px solid #2563eb;
+}}
+
+QPushButton#BtnAllowConversation:hover, QPushButton#BtnAllowGlobal:hover {{
+    background-color: #2563eb;
+    color: #ffffff;
+}}
+
+QPushButton#BtnAllowConversation:focus, QPushButton#BtnAllowGlobal:focus {{
+    outline: none;
+    border: 2px solid #bfdbfe;
 }}
 
 QPushButton#BtnDismiss {{

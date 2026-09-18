@@ -87,6 +87,10 @@ class RequestQueue:
     def get_pending_list(self) -> list[InteractionRequest]:
         return list(self._pending)
 
+    def list_all(self) -> list[InteractionRequest]:
+        """Return all historical and active requests."""
+        return list(self._all_requests.values())
+
     def count(self) -> int:
         """Return number of unresolved pending requests."""
         return len(self._pending)

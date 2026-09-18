@@ -11,6 +11,7 @@ from typing import Any, Callable
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
+from ag_attention_bridge.antigravity.models import InteractionState, InteractionType
 from ag_attention_bridge.config import (
     SOCKET_PATH,
     SYNTHETIC_FALLBACK_ENABLED,
@@ -42,6 +43,7 @@ class IpcServer(QObject):
     """Local IPC server running on Qt event loop via QLocalServer."""
 
     request_received = Signal(object)  # Emits InteractionRequest
+    _interaction_discovered = Signal(object, object)  # (resolved_data: dict, context_data: dict)
 
     def __init__(
         self,
@@ -61,11 +63,16 @@ class IpcServer(QObject):
 
         self._server = QLocalServer(self)
         self._server.newConnection.connect(self._handle_new_connection)
+        self._interaction_discovered.connect(self._on_interaction_discovered)
 
         # Map request_id -> (QLocalSocket, client_msg_id)
         self._pending_responses: dict[str, tuple[QLocalSocket, str]] = {}
         # Buffer per socket for streaming newline-delimited messages
         self._socket_buffers: dict[QLocalSocket, bytearray] = {}
+        # Guard to prevent duplicate concurrent waiting checks for the same conversation
+        self._checking_conversations: set[str] = set()
+        self._scanning: bool = False
+        self._poll_timer: Any | None = None
 
     def start(self) -> bool:
         """Start listening on the local unix socket."""
@@ -88,8 +95,54 @@ class IpcServer(QObject):
         logger.info("IPC server listening on %s", self.socket_path)
         return True
 
+    def start_background_poller(self, interval_ms: int = 2000) -> None:
+        """Start periodic background scanning across all discovered language servers."""
+        from PySide6.QtCore import QTimer
+
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+
+        self._poll_timer = QTimer(self)
+        self._poll_timer.timeout.connect(self.poll_active_interactions)
+        self._poll_timer.start(interval_ms)
+        logger.info("Active Language Server poller started (interval: %dms)", interval_ms)
+        self.poll_active_interactions()
+
+    def poll_active_interactions(self) -> None:
+        """Asynchronously scan all running language servers for waiting interactions."""
+        if not self.resolver or self._scanning:
+            return
+
+        self._scanning = True
+        import threading
+
+        def _worker():
+            try:
+                waiting_list = self.resolver.scan_waiting_interactions()
+                for cid, resolved in waiting_list:
+                    ws_path = resolved.get("workspace_path")
+                    self._interaction_discovered.emit(
+                        resolved,
+                        {
+                            "conversation_id": cid,
+                            "workspace_path": ws_path,
+                            "payload": {},
+                        },
+                    )
+            except Exception as e:
+                logger.debug("Background poller error: %s", e)
+            finally:
+                self._scanning = False
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
     def stop(self) -> None:
         """Shut down the IPC server and disconnect clients."""
+        if self._poll_timer is not None:
+            self._poll_timer.stop()
+            self._poll_timer = None
+
         for sock, _ in list(self._pending_responses.values()):
             try:
                 sock.disconnectFromServer()
@@ -181,11 +234,169 @@ class IpcServer(QObject):
                     transcript_path=payload.get("transcriptPath"),
                 )
             self._send_to_socket(socket, IpcResponse(reply_to=msg_id, status="ok"))
+        elif msg_type == MessageType.CHECK_WAITING.value:
+            self._handle_check_waiting(socket, msg_id, conversation_id, payload)
         else:
             self._send_to_socket(
                 socket,
                 IpcResponse(reply_to=msg_id, status="error", error=f"Unknown message type: {msg_type}"),
             )
+
+    def _handle_check_waiting(
+        self,
+        socket: QLocalSocket,
+        msg_id: str,
+        conversation_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        if conversation_id:
+            self.sessions.get_or_create(
+                conversation_id,
+                workspace_paths=payload.get("workspacePaths"),
+                model_name=payload.get("modelName"),
+                transcript_path=payload.get("transcriptPath"),
+            )
+        self._send_to_socket(socket, IpcResponse(reply_to=msg_id, status="ok"))
+
+        if not self.resolver or not conversation_id:
+            return
+
+        if conversation_id in self._checking_conversations:
+            return
+
+        self._checking_conversations.add(conversation_id)
+
+        import threading
+
+        ws_paths = payload.get("workspacePaths", [])
+        ws_path = ws_paths[0] if ws_paths else None
+
+        def _worker():
+            try:
+                resolved = self.resolver.resolve_authoritative_waiting_interaction(
+                    cascade_id=conversation_id,
+                    workspace_path=ws_path,
+                    max_retries=8,
+                )
+                if resolved:
+                    self._interaction_discovered.emit(
+                        resolved,
+                        {
+                            "conversation_id": conversation_id,
+                            "workspace_path": ws_path,
+                            "payload": payload,
+                        },
+                    )
+            except Exception as e:
+                logger.warning("Error in background check_waiting worker for %s: %s", conversation_id, e)
+            finally:
+                self._checking_conversations.discard(conversation_id)
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+
+    def _on_interaction_discovered(self, resolved: dict[str, Any], ctx: dict[str, Any]) -> None:
+        conversation_id = ctx.get("conversation_id", "")
+        ws_path = ctx.get("workspace_path") or resolved.get("workspace_path")
+
+        trajectory_id = resolved.get("trajectory_id", "")
+        step_index = resolved.get("step_index", 0)
+        int_type = resolved.get("interaction_type")
+
+        # Auto-purge any stale pending requests for this conversation from earlier steps
+        for old_req in self.queue.get_pending_list():
+            if (
+                old_req.conversation_id == conversation_id
+                and old_req.step_index is not None
+                and old_req.step_index < step_index
+            ):
+                logger.info(
+                    "Auto-purging stale pending request %s (step %d < current step %d)",
+                    old_req.request_id,
+                    old_req.step_index,
+                    step_index,
+                )
+                self.queue.consume(old_req.request_id)
+
+        # Deduplication: check if already in queue with same conversation_id & step_index
+        for req in self.queue.list_all():
+            if (
+                req.conversation_id == conversation_id
+                and req.trajectory_id == trajectory_id
+                and req.step_index == step_index
+            ):
+                return
+
+        request_id = f"auto-{conversation_id[:8]}-{step_index}"
+
+        if int_type == InteractionType.ASK_QUESTION:
+            req_type = RequestType.QUESTION
+            native_questions = resolved.get("questions", [])
+            parsed_questions: list[QuestionItem] = []
+            for idx, nq in enumerate(native_questions):
+                parsed_opts = [
+                    InteractionOption(id=opt.id, label=opt.text)
+                    for opt in nq.options
+                ]
+                parsed_questions.append(
+                    QuestionItem(
+                        id=str(idx),
+                        question=nq.question,
+                        options=parsed_opts,
+                        multi_select=nq.is_multi_select,
+                        allow_custom_input=True,
+                    )
+                )
+            if parsed_questions:
+                title = parsed_questions[0].question if len(parsed_questions) == 1 else f"Questions ({len(parsed_questions)} items)"
+                body = parsed_questions[0].question
+                options = parsed_questions[0].options
+                multi_select = parsed_questions[0].multi_select
+            else:
+                title = "Question from Antigravity"
+                body = ""
+                options = []
+                multi_select = False
+        else:
+            req_type = RequestType.PERMISSION
+            parsed_questions = []
+            action = resolved.get("permission_action") or "permission"
+            target = resolved.get("permission_target") or ""
+            reason = resolved.get("permission_reason") or ""
+            title = reason if reason else f"Permission Request: {action}"
+            body = f"Target: {target}\nReason: {reason}"
+            options = [
+                InteractionOption(id="allow", label="Allow Once"),
+                InteractionOption(id="allow_conversation", label="Always in Conversation"),
+                InteractionOption(id="allow_global", label="Always Globally"),
+                InteractionOption(id="deny", label="Deny"),
+            ]
+            multi_select = False
+
+        interaction_req = InteractionRequest(
+            request_id=request_id,
+            conversation_id=conversation_id,
+            request_type=req_type,
+            title=title,
+            body=body,
+            questions=parsed_questions,
+            options=options,
+            multi_select=multi_select,
+            workspace_path=ws_path,
+            trajectory_id=trajectory_id,
+            step_index=step_index,
+            state=InteractionState.NATIVE_WAITING_READY,
+        )
+
+        self.queue.enqueue(interaction_req)
+        logger.info(
+            "Auto-discovered native %s interaction for cascade %s (step %d) enqueued as %s",
+            req_type.value,
+            conversation_id,
+            step_index,
+            request_id,
+        )
+        self.request_received.emit(interaction_req)
 
     def _handle_submit_request(
         self,
@@ -472,7 +683,9 @@ class IpcServer(QObject):
                 data=decision_data,
             )
             self._send_to_socket(client_socket, adapter_resp)
-            self.queue.consume(request_id)
+
+        # Always consume the request from pending queue upon resolution
+        self.queue.consume(request_id)
         return True
 
     def _handle_get_pending_injection(

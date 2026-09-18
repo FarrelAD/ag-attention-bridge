@@ -94,7 +94,7 @@ All RPC calls require:
 | `GetCascadeTrajectory` | POST | Retrieves full conversation trajectory steps, state transitions, and tool calls. |
 | `GetCascadeTrajectorySteps` | POST | Retrieves sliced steps starting from `stepOffset`. |
 | `HandleCascadeUserInteraction` | POST | **Primary resolution endpoint.** Submits user interaction decisions natively. |
-| `SearchConversations` | POST | Lists active and historical conversations in the workspace. |
+| `SearchConversations` | POST | Lists active and historical conversations in the workspace. Returns items containing `needsAttention: bool` (`true` when waiting for user input). |
 
 ---
 
@@ -102,17 +102,24 @@ All RPC calls require:
 
 ### 5.1 Trajectory Step Anatomy
 In Antigravity 1.1.3:
-* When the agent calls `ask_question`:
+* **Question Flow (`ask_question`)**:
   1. A step with `type: "CORTEX_STEP_TYPE_PLANNER_RESPONSE"` and `status: "CORTEX_STEP_STATUS_DONE"` is created (contains the tool call definition).
   2. Antigravity creates an execution step with `type: "CORTEX_STEP_TYPE_ASK_QUESTION"`.
   3. The execution step contains `requestedInteraction: {"askQuestion": {"questions": [...]}}`.
   4. Status transitions to `CORTEX_STEP_STATUS_WAITING`.
-* When the user answers:
-  1. Antigravity appends `completedInteractions: [{"request": {...}, "response": {...}}]`.
-  2. Status transitions to `CORTEX_STEP_STATUS_DONE`.
+  5. In `SearchConversations`, the conversation has `"needsAttention": true`.
+* **Terminal / File Permission Flow (`run_command`, `write_to_file`)**:
+  1. Antigravity security sandbox pauses the tool execution step (e.g. `type: "CORTEX_STEP_TYPE_RUN_COMMAND"`).
+  2. Step status transitions to `CORTEX_STEP_STATUS_WAITING`.
+  3. Step contains `requestedInteraction: {"permission": {"resource": {"action": "command", "target": "<cmd>"}, "actionDescription": "<desc>", "suggestedPersistPattern": "<pattern>"}}`.
+  4. In `SearchConversations`, the conversation has `"needsAttention": true`.
+* **Resolution**:
+  1. When the user responds via `HandleCascadeUserInteraction`, Antigravity appends `completedInteractions: [{"request": {...}, "response": {...}}]`.
+  2. Status transitions to `CORTEX_STEP_STATUS_DONE` (or `CORTEX_STEP_STATUS_RUNNING` for authorized commands).
+  3. `"needsAttention"` is cleared.
 
 > [!IMPORTANT]
-> The target `stepIndex` for `HandleCascadeUserInteraction` **must** be the execution step index (`CORTEX_STEP_TYPE_ASK_QUESTION`), **never** the planner response step index.
+> The target `stepIndex` for `HandleCascadeUserInteraction` **must** be the execution step index (`CORTEX_STEP_TYPE_ASK_QUESTION` or `CORTEX_STEP_TYPE_RUN_COMMAND`), **never** the planner response step index.
 
 ### 5.2 `HandleCascadeUserInteraction` Request Schema
 

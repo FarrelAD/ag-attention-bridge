@@ -8,14 +8,17 @@ Surfaces `ask_question`, permissions, and approvals as an always-on-top modal di
 
 ## 1. Overview & Key Capabilities
 
-* **Native Antigravity Integration**: Resolves user interactions directly through Antigravity's internal ConnectRPC endpoint (`POST /HandleCascadeUserInteraction`) in ~3–5ms. **No synthetic `userMessage` chat injection, no keyboard simulation, and no AT-SPI accessibility automation.**
+* **Universal Multi-Project Discovery**: Automatically monitors active Antigravity Language Servers across all workspace folders and projects on your system via active background polling (`needsAttention: true`). Global installation covers everything without per-project setup.
 * **Always-On-Top Modal**: Compact, content-driven dark modal with project title badge (`📁 <project_name>`), session ID, model tag, and queue indicators.
 * **Keyboard-First Navigation**:
-  * `1–9`: Directly select visible options.
-  * `↑` / `↓` / `Tab`: Navigate options.
-  * `←` / `→`: Navigate permission action buttons (`Deny`, `Allow Conversation`, `Allow Once`).
-  * `Enter`: Submit selection.
-  * `Esc`: Hide to system tray (**does not deny or cancel the interaction**).
+  * **Question Dialogs**: `1–9` directly selects visible options; `↑` / `↓` / `Tab` navigates; `Enter` submits.
+  * **Permission Dialogs**:
+    * `1` or `Enter`: **Allow this time** (`PERMISSION_SCOPE_ONCE`)
+    * `2`: **Always allow in this conversation** (`PERMISSION_SCOPE_CONVERSATION`)
+    * `3`: **Always allow globally** (`PERMISSION_SCOPE_GLOBAL`)
+    * `4` or `D`: **Deny**
+    * `←` / `→` / `Tab`: Navigate between all permission action buttons.
+  * `Esc`: Hide to system tray (**does not deny or cancel the interaction**; remains pending and accessible from tray).
 * **Persistent System Tray**: Dynamic numeric badge rendered into the tray icon via `QPainter`. Left-click to reopen pending requests; right-click context menu for quick controls.
 * **Multi-Session FIFO Queue**: Seamlessly queues interactions across multiple concurrent agent conversations.
 * **Ultra-Low Resource Footprint**: Pure event-driven Qt event loop with ~0% idle CPU and ~70–90MB RAM.

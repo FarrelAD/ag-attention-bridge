@@ -186,7 +186,39 @@ The modal header complies with Project Rules by displaying:
 
 ---
 
-## 5. Security & Isolation Controls
+## 5. Active Language Server Poller (`needsAttention: true`)
+
+### 5.1 The Reactive Hook Limitation for Terminal Permissions
+Antigravity's security sandbox pauses execution for terminal (`run_command`) and out-of-workspace file modification tools before tool execution starts:
+1. `PostInvocation` **never fires** while a tool is waiting for permission (because tool execution has not completed).
+2. `PreToolUse` requires a non-empty `decision` (`allow` or `deny`). Outputting an empty object `{}` causes Antigravity to reject the tool (`tool call denied`). Outputting `allow` in advance bypasses user security checks.
+3. Therefore, relying solely on reactive hooks creates a visibility gap for sandbox permissions across multiple windows.
+
+### 5.2 The Native Discovery Solution
+Antigravity Language Servers maintain an authoritative list of conversations via ConnectRPC `SearchConversations`. When any conversation is paused waiting for user input (questions or permissions), Antigravity marks the conversation item with:
+```json
+"needsAttention": true
+```
+
+### 5.3 Background Poller Architecture
+* **`InteractionResolver.scan_waiting_interactions()`**:
+  * Iterates across all discovered Language Server PIDs in `/proc`.
+  * Calls `SearchConversations` on each server using cached HTTP clients.
+  * When `"needsAttention": true` is found, resolves the authoritative interaction via `resolve_authoritative_waiting_interaction(cascade_id, max_retries=2)`.
+* **`IpcServer.start_background_poller(interval_ms=2000)`**:
+  * A non-blocking `QTimer` dispatches worker threads every 2.0 seconds.
+  * Ensures only one scanning thread runs concurrently (`self._scanning` guard).
+  * Emits `_interaction_discovered` signal directly back to the Qt main thread upon discovery.
+* **On-Demand Polling**:
+  * Daemon startup immediately triggers `poll_active_interactions()`.
+  * Clicking the KDE system tray icon ("Open Pending Requests" or "Show/Hide Current Request") instantly polls all Language Servers.
+* **Deterministic Queue Management**:
+  * When a request is resolved, `self.queue.consume(request_id)` is invoked unconditionally, immediately updating tray badges.
+  * Stale requests from older steps in the same conversation are auto-purged (`old_req.step_index < current_step_index`).
+
+---
+
+## 6. Security & Isolation Controls
 
 1. **Localhost Only**: `AntigravityClient` verifies that the target address is `127.0.0.1` or `localhost`. Remote addresses trigger an immediate `SecurityValidationError`.
 2. **Process UID Verification**: Scans in `/proc` check `stat_info.st_uid == os.getuid()`. Processes owned by other users or containers are rejected.
@@ -195,7 +227,7 @@ The modal header complies with Project Rules by displaying:
 
 ---
 
-## 6. Keyboard & Window Behavior (KDE Wayland)
+## 7. Keyboard & Window Behavior (KDE Wayland)
 
 * **Always-On-Top**: `Qt.WindowType.WindowStaysOnTopHint` applied to `InteractionModal`.
 * **KWin Window Rules**: Rules ensure window placement is centered, kept above, and accepts immediate focus without window-manager stealing prevention delays.
@@ -205,7 +237,7 @@ The modal header complies with Project Rules by displaying:
 
 ---
 
-## 7. Verification & Test Coverage
+## 8. Verification & Test Coverage
 
 All automated unit and integration tests pass:
 * `tests/test_antigravity_discovery.py` — Global and workspace server discovery, port fallback, UID validation.

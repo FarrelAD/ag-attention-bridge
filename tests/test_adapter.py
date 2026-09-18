@@ -161,3 +161,5 @@ def test_handle_hook_malformed_and_empty():
     res_bad_json, code_bad = handle_hook("NOT_VALID_JSON{{{")
     assert code_bad == 0
     assert res_bad_json == {}
+
+

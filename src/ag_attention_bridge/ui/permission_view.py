@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -69,14 +70,19 @@ class PermissionView(QWidget):
         # Action Header row
         header_row = QHBoxLayout()
         header_row.setSpacing(8)
+        header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         lbl_action_tag = QLabel("ACTION REQUIRED", self)
         lbl_action_tag.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;")
-        header_row.addWidget(lbl_action_tag)
+        lbl_action_tag.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        header_row.addWidget(lbl_action_tag, 0, Qt.AlignmentFlag.AlignVCenter)
 
         self.badge_action = QLabel(self._action_name, self)
         self.badge_action.setObjectName("PermissionActionBadge")
-        header_row.addWidget(self.badge_action)
+        self.badge_action.setFixedHeight(24)
+        self.badge_action.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.badge_action.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_row.addWidget(self.badge_action, 0, Qt.AlignmentFlag.AlignVCenter)
         header_row.addStretch()
 
         layout.addLayout(header_row)
@@ -116,6 +122,8 @@ class PermissionView(QWidget):
             reason_layout.addWidget(self.lbl_reason)
 
             layout.addWidget(reason_box)
+
+        layout.addStretch(1)
 
     def set_initial_focus(self) -> None:
         """Allow focusing target text or first control."""

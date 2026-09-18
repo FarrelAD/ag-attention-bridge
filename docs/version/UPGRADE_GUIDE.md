@@ -16,6 +16,7 @@ When Antigravity updates, run through these five quick checks:
 [ ] Check 3: HTTPS Port Discovery (Does inode /proc/net/tcp lookup still find the port?)
 [ ] Check 4: ConnectRPC Endpoints (Are HandleCascadeUserInteraction and GetCascadeTrajectory still valid?)
 [ ] Check 5: Step Structure (Are CORTEX_STEP_TYPE_ASK_QUESTION and requestedInteraction unchanged?)
+[ ] Check 6: Active Poller / needsAttention flag (Does SearchConversations still return needsAttention: true?)
 ```
 
 ---
@@ -179,6 +180,7 @@ Use this table to find the exact file to modify when a specific component change
 | **Permission payload / scopes** | [`src/ag_attention_bridge/antigravity/client.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/client.py)<br>[`src/ag_attention_bridge/antigravity/models.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/models.py) | `build_permission_payload`<br>`PermissionScope` enum |
 | **Step matching & Waiting step criteria** | [`src/ag_attention_bridge/antigravity/client.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/client.py) | `find_waiting_interaction` (line 155) |
 | **Server candidate selection logic** | [`src/ag_attention_bridge/antigravity/interaction_resolver.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/interaction_resolver.py) | `_get_client_for_cascade` (line 66) |
+| **Active Poller & Multi-Workspace Scanning** | [`src/ag_attention_bridge/antigravity/interaction_resolver.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/interaction_resolver.py)<br>[`src/ag_attention_bridge/ipc/server.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/ipc/server.py) | `scan_waiting_interactions`<br>`start_background_poller`, `poll_active_interactions` |
 | **Hook Adapter Matcher / PreToolUse JSON** | [`src/ag_attention_bridge/hooks/adapter.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/hooks/adapter.py)<br>[`scripts/install-hooks.sh`](file:///home/mashupsoat/development/ag-attention-bridge/scripts/install-hooks.sh) | `handle_hook`<br>`HOOKS_FILE` template |
 
 ---

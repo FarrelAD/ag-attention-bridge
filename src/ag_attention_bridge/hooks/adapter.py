@@ -202,7 +202,7 @@ def handle_hook(
     conv_id = payload.get("conversationId", "")
 
     # Attempt to auto-start daemon on decision-requiring or invocation events
-    if auto_start and event_type in ("PreToolUse", "PreInvocation"):
+    if auto_start and event_type in ("PreToolUse", "PreInvocation", "PostInvocation"):
         ensure_daemon_running(client)
 
     response: dict[str, Any] = {}
@@ -251,8 +251,7 @@ def handle_hook(
 
         # Legacy Synthetic Fallback Path (enabled ONLY when AG_ATTENTION_SYNTHETIC_FALLBACK=1)
         if not SYNTHETIC_FALLBACK_ENABLED:
-            # Under native mode, non-observation tools pass through without blocking
-            return {}, 0
+            return generate_default_response(event_type, payload), 0
 
         if not client.is_available():
             response = generate_default_response(event_type, payload, "Fallback: daemon offline")
@@ -348,8 +347,19 @@ def handle_hook(
         else:
             response = {}
 
+    elif event_type == "PostInvocation":
+        if client.is_available():
+            notify_payload = dict(payload)
+            msg = IpcMessage(
+                type=MessageType.CHECK_WAITING,
+                conversation_id=conv_id,
+                payload=notify_payload,
+            )
+            client.send_fire_and_forget(msg)
+        response = {}
+
     else:
-        # Non-blocking lifecycle notifications (PostInvocation, PostToolUse)
+        # Non-blocking lifecycle notifications (PostToolUse, etc.)
         if client.is_available():
             notify_msg = IpcMessage(
                 type=MessageType.NOTIFY_EVENT,

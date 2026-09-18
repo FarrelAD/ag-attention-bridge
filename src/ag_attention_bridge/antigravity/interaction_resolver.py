@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from typing import Any
@@ -286,20 +287,87 @@ class InteractionResolver:
                 "questions": parsed_questions,
             }
         else:
-            action = "run_command" if "runCommand" in step_data else "permission"
+            perm_dict = perm if isinstance(perm, dict) else {}
+            res_dict = perm_dict.get("resource", {}) if isinstance(perm_dict.get("resource"), dict) else {}
+            action = res_dict.get("action") or ("run_command" if "runCommand" in step_data else "permission")
+            target = res_dict.get("target") or step_data.get("runCommand", {}).get("commandLine", "")
+            if not target:
+                meta_tc = step_data.get("metadata", {}).get("toolCall", {})
+                args_raw = meta_tc.get("argumentsJson")
+                if isinstance(args_raw, str):
+                    try:
+                        args = json.loads(args_raw)
+                        target = args.get("CommandLine") or args.get("TargetFile") or args.get("Command") or ""
+                    except Exception:
+                        pass
+                elif isinstance(args_raw, dict):
+                    target = args_raw.get("CommandLine") or args_raw.get("TargetFile") or ""
+            reason = (
+                perm_dict.get("actionDescription")
+                or step_data.get("metadata", {}).get("toolSummary")
+                or step_data.get("metadata", {}).get("toolAction")
+                or f"Antigravity requested execution of {action}"
+            )
+            suggested_pattern = perm_dict.get("suggestedPersistPattern", "")
+
             log_native_diagnostic(
                 "NATIVE_READY",
                 conversation_id=cascade_id,
                 trajectory_id=trajectory_id,
                 step_index=step_index,
                 interaction_type="permission",
+                extra=f"action={action} target={target[:60]}",
             )
             return {
                 "trajectory_id": trajectory_id,
                 "step_index": step_index,
                 "interaction_type": InteractionType.PERMISSION,
                 "permission_action": action,
+                "permission_target": target,
+                "permission_reason": reason,
+                "suggested_pattern": suggested_pattern,
             }
+
+    def scan_waiting_interactions(self) -> list[tuple[str, dict[str, Any]]]:
+        """Scan all running language servers for cascades needing attention and resolve waiting steps.
+
+        Returns a list of (cascade_id, resolved_interaction_dict).
+        """
+        results: list[tuple[str, dict[str, Any]]] = []
+        try:
+            servers = self.discovery.discover_servers()
+        except Exception as e:
+            logger.debug("Error discovering servers during scan: %s", e)
+            return results
+
+        for server in servers:
+            try:
+                with self._lock:
+                    if server.pid in self._client_cache:
+                        client = self._client_cache[server.pid]
+                    else:
+                        client = AntigravityClient(server, timeout=3.0)
+                        self._client_cache[server.pid] = client
+
+                convs = client.search_conversations()
+                for conv in convs:
+                    if conv.get("needsAttention"):
+                        cid = conv.get("cascadeId")
+                        if cid:
+                            resolved = self.resolve_authoritative_waiting_interaction(cid, max_retries=2)
+                            if resolved:
+                                ws_name = (
+                                    conv.get("workspaceName")
+                                    or conv.get("worktreeRoot")
+                                    or (client.server.workspace_path if client.server else None)
+                                )
+                                resolved["workspace_path"] = ws_name
+                                results.append((cid, resolved))
+            except Exception as e:
+                logger.debug("Error scanning server PID %d: %s", server.pid, e)
+                continue
+
+        return results
 
     def submit_question_response(
         self,

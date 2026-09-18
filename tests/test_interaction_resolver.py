@@ -188,3 +188,41 @@ def test_multi_server_candidate_selection_prioritizes_freshest_and_waiting():
     assert winner.server.pid == 1002
     assert winner is c2
 
+
+def test_scan_waiting_interactions():
+    """Verify that scan_waiting_interactions finds cascades with needsAttention: true."""
+    s1 = AntigravityServer(pid=2001, workspace_id="ws-scan", https_port=4003, csrf_token="tok3")
+    c1 = MockClient(server=s1)
+    c1.search_conversations = lambda query="": [
+        {"cascadeId": "active-1", "title": "Review", "needsAttention": True},
+        {"cascadeId": "idle-2", "title": "Done", "needsAttention": False},
+    ]
+    c1.find_waiting_interaction = lambda cid, max_retries=5, retry_delays=None: (
+        "traj-scan-1",
+        0,
+        {
+            "status": "WAITING",
+            "type": "CORTEX_STEP_TYPE_RUN_COMMAND",
+            "requestedInteraction": {
+                "permission": {
+                    "resource": {"action": "command", "target": "ls -la"},
+                    "actionDescription": "List files",
+                }
+            },
+        },
+    )
+
+    disc = MockDiscovery(servers=[s1])
+    resolver = InteractionResolver(discovery=disc)
+    resolver._client_cache[2001] = c1
+
+    results = resolver.scan_waiting_interactions()
+    assert len(results) == 1
+    cid, resolved = results[0]
+    assert cid == "active-1"
+    assert resolved["permission_action"] == "command"
+    assert resolved["permission_target"] == "ls -la"
+    assert resolved["permission_reason"] == "List files"
+
+
+

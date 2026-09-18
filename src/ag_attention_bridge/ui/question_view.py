@@ -212,6 +212,8 @@ class QuestionView(QWidget):
             layout.addWidget(section)
             self._sections.append(section)
 
+        layout.addStretch(1)
+
     def set_initial_focus(self) -> None:
         if self._sections:
             self._sections[0].set_focus()

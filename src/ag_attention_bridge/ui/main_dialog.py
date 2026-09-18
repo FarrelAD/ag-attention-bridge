@@ -69,7 +69,7 @@ class InteractionModal(QDialog):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.setFixedWidth(660)
+        self.setFixedWidth(720)
         self.setMinimumHeight(280)
 
     def _setup_layout(self) -> None:
@@ -147,11 +147,11 @@ class InteractionModal(QDialog):
         self.footer_frame = QFrame(self.container_frame)
         self.footer_frame.setObjectName("FooterFrame")
         self.footer_layout = QHBoxLayout(self.footer_frame)
-        self.footer_layout.setContentsMargins(18, 12, 18, 14)
-        self.footer_layout.setSpacing(10)
+        self.footer_layout.setContentsMargins(16, 12, 16, 14)
+        self.footer_layout.setSpacing(6)
 
         # Dismiss Button (Left)
-        self.btn_dismiss = QPushButton("Hide to Tray (Esc)", self.footer_frame)
+        self.btn_dismiss = QPushButton("Hide (Esc)", self.footer_frame)
         self.btn_dismiss.setObjectName("BtnDismiss")
         self.btn_dismiss.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_dismiss.clicked.connect(self.hide_to_tray)
@@ -169,6 +169,12 @@ class InteractionModal(QDialog):
         self.btn_deny.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_deny.clicked.connect(self._on_deny_clicked)
         self.footer_layout.addWidget(self.btn_deny)
+
+        self.btn_allow_global = QPushButton("Always Globally", self.footer_frame)
+        self.btn_allow_global.setObjectName("BtnAllowGlobal")
+        self.btn_allow_global.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_allow_global.clicked.connect(self._on_allow_global_clicked)
+        self.footer_layout.addWidget(self.btn_allow_global)
 
         self.btn_allow_conversation = QPushButton("Allow Conversation", self.footer_frame)
         self.btn_allow_conversation.setObjectName("BtnAllowConversation")
@@ -199,15 +205,20 @@ class InteractionModal(QDialog):
         if request.request_type == RequestType.PERMISSION:
             self._content_widget = PermissionView(request, self.scroll_container)
             self.btn_deny.setVisible(True)
+            self.btn_deny.setText("Deny (4)")
+            self.btn_allow_global.setVisible(True)
+            self.btn_allow_global.setText("Always Globally (3)")
             self.btn_allow_conversation.setVisible(True)
+            self.btn_allow_conversation.setText("Always in Conv (2)")
             self.btn_submit.setObjectName("BtnAllow")
-            self.btn_submit.setText("Allow Once (Enter)")
+            self.btn_submit.setText("Allow Once (1 / ↵)")
             self.btn_submit.setDefault(True)
             apply_theme(self)
         else:
             self._content_widget = QuestionView(request, self.scroll_container)
             self.btn_deny.setVisible(False)
             self.btn_allow_conversation.setVisible(False)
+            self.btn_allow_global.setVisible(False)
             self.btn_submit.setObjectName("BtnSubmit")
             self.btn_submit.setText("Submit (Enter)")
             self.btn_submit.setDefault(True)
@@ -369,6 +380,7 @@ class InteractionModal(QDialog):
         self.btn_submit.setEnabled(enabled)
         self.btn_deny.setEnabled(enabled)
         self.btn_allow_conversation.setEnabled(enabled)
+        self.btn_allow_global.setEnabled(enabled)
         self.btn_dismiss.setEnabled(enabled)
         self.btn_close.setEnabled(enabled)
 
@@ -487,6 +499,13 @@ class InteractionModal(QDialog):
             permission_scope=PermissionScope.PERMISSION_SCOPE_CONVERSATION,
         )
 
+    def _on_allow_global_clicked(self) -> None:
+        from ag_attention_bridge.antigravity.models import PermissionScope
+        self.submit_current_interaction(
+            action_type="allow",
+            permission_scope=PermissionScope.PERMISSION_SCOPE_GLOBAL,
+        )
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle keyboard navigation: Esc hides; 1-9 shortcuts; Left/Right arrow; Enter submits."""
         if event.key() == Qt.Key.Key_Escape:
@@ -495,17 +514,38 @@ class InteractionModal(QDialog):
             event.accept()
             return
 
-        # Permission Left/Right arrow navigation between action buttons
+        # Permission 1, 2, 3, 4 shortcuts and Left/Right arrow navigation
         if self.current_request and self.current_request.request_type == RequestType.PERMISSION:
+            if event.key() == Qt.Key.Key_1:
+                self._on_submit_clicked()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_2:
+                self._on_allow_conversation_clicked()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_3:
+                self._on_allow_global_clicked()
+                event.accept()
+                return
+            elif event.key() in (Qt.Key.Key_4, Qt.Key.Key_D):
+                self._on_deny_clicked()
+                event.accept()
+                return
+
             if event.key() == Qt.Key.Key_Left:
                 if self.btn_submit.hasFocus():
                     self.btn_allow_conversation.setFocus()
                 elif self.btn_allow_conversation.hasFocus():
+                    self.btn_allow_global.setFocus()
+                elif self.btn_allow_global.hasFocus():
                     self.btn_deny.setFocus()
                 event.accept()
                 return
             elif event.key() == Qt.Key.Key_Right:
                 if self.btn_deny.hasFocus():
+                    self.btn_allow_global.setFocus()
+                elif self.btn_allow_global.hasFocus():
                     self.btn_allow_conversation.setFocus()
                 elif self.btn_allow_conversation.hasFocus():
                     self.btn_submit.setFocus()
@@ -534,6 +574,8 @@ class InteractionModal(QDialog):
             if self.current_request and self.current_request.request_type == RequestType.PERMISSION:
                 if self.btn_deny.hasFocus():
                     self._on_deny_clicked()
+                elif self.btn_allow_global.hasFocus():
+                    self._on_allow_global_clicked()
                 elif self.btn_allow_conversation.hasFocus():
                     self._on_allow_conversation_clicked()
                 else:
