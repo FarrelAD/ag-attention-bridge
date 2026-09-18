@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ag-attention-bridge"
+version = "0.1.0"
+description = "Lightweight KDE Plasma Wayland attention companion for Google Antigravity"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Mashupsoat" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment :: K Desktop Environment (KDE)",
+]
+dependencies = [
+    "PySide6>=6.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+ag-attention-bridge = "ag_attention_bridge.app:main"
+ag-hook-adapter = "ag_attention_bridge.hooks.adapter:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

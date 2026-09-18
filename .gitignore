@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+env/
+venv/
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local observation logs & state
+.agents/logs/*.jsonl
+.agents/logs/*.log
+*.sock
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
