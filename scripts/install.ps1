@@ -83,62 +83,61 @@ if (Test-Path $HooksJsonPath) {
     Write-Host "- Backed up existing hooks.json to hooks.json.bak"
 }
 
-# Safely merge hooks using Python
-$EscapedHookCmd = ($HookAdapterCmd -replace '\\', '\\')
-
-& "$PythonExe" - <<EOF
-import json
-from pathlib import Path
-
-hooks_path = Path(r"$HooksJsonPath")
-config = {}
-if hooks_path.exists():
-    try:
-        config = json.loads(hooks_path.read_text(encoding="utf-8"))
-    except Exception:
-        config = {}
-
-adapter_cmd = r"$HookAdapterCmd"
-
-config["ag-attention-bridge"] = {
-    "PreToolUse": [
-        {
-            "matcher": "ask_question|ask_permission",
-            "hooks": [
-                {
-                    "type": "command",
-                    "command": f'"{adapter_cmd}" --event PreToolUse',
-                    "timeout": 30
-                }
-            ]
-        }
-    ],
-    "PreInvocation": [
-        {
-            "type": "command",
-            "command": f'"{adapter_cmd}" --event PreInvocation',
-            "timeout": 15
-        }
-    ],
-    "PostInvocation": [
-        {
-            "type": "command",
-            "command": f'"{adapter_cmd}" --event PostInvocation',
-            "timeout": 15
-        }
-    ],
-    "Stop": [
-        {
-            "type": "command",
-            "command": f'"{adapter_cmd}" --event Stop',
-            "timeout": 15
-        }
-    ]
+# Safely merge hooks using native PowerShell JSON cmdlets
+$Config = @{}
+if (Test-Path $HooksJsonPath) {
+    try {
+        $Config = Get-Content -Raw -Path $HooksJsonPath -Encoding utf8 | ConvertFrom-Json
+    } catch {
+        $Config = @{}
+    }
 }
 
-hooks_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-print("- Successfully updated " + str(hooks_path))
-EOF
+$BridgeHooks = @{
+    PreToolUse = @(
+        @{
+            matcher = "ask_question|ask_permission"
+            hooks   = @(
+                @{
+                    type    = "command"
+                    command = "`"$HookAdapterCmd`" --event PreToolUse"
+                    timeout = 30
+                }
+            )
+        }
+    )
+    PreInvocation = @(
+        @{
+            type    = "command"
+            command = "`"$HookAdapterCmd`" --event PreInvocation"
+            timeout = 15
+        }
+    )
+    PostInvocation = @(
+        @{
+            type    = "command"
+            command = "`"$HookAdapterCmd`" --event PostInvocation"
+            timeout = 15
+        }
+    )
+    Stop = @(
+        @{
+            type    = "command"
+            command = "`"$HookAdapterCmd`" --event Stop"
+            timeout = 15
+        }
+    )
+}
+
+if ($Config.PSObject.Properties.Match("ag-attention-bridge").Count -gt 0) {
+    $Config."ag-attention-bridge" = $BridgeHooks
+} else {
+    $Config | Add-Member -NotePropertyName "ag-attention-bridge" -NotePropertyValue $BridgeHooks -Force
+}
+
+$UpdatedJson = $Config | ConvertTo-Json -Depth 10
+Set-Content -Path $HooksJsonPath -Value $UpdatedJson -Encoding utf8
+Write-Host "- Successfully updated $HooksJsonPath" -ForegroundColor Green
 
 # 5. Optional Windows Startup Autostart Shortcut
 if (-not $NoStartup) {
