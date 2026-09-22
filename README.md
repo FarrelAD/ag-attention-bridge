@@ -1,8 +1,17 @@
 # Ag Attention Bridge
 
-A lightweight desktop companion for **Google Antigravity** on Linux (**KDE Plasma + Wayland / X11**).
+A lightweight desktop companion for **Google Antigravity** on Linux (**KDE Plasma + Wayland / X11**) and **Windows** (Win32).
 
 Surfaces `ask_question`, permissions, and approvals as an always-on-top modal dialog and persistent system tray icon, letting you respond to the AI assistant in milliseconds without switching away from your active workflow.
+
+---
+
+## Visual Preview & Interface Showcase
+
+| Question Interaction Dialog | Permission & Command Approval Dialog |
+|:---:|:---:|
+| ![Question Dialog Preview](docs/ui_question_preview.png) | ![Permission Dialog Preview](docs/ui_permission_preview.png) |
+| *Direct `1-9` numeric quick-select, arrow keys, and freeform response* | *Monospace command target preview, justification reason, and `1-4` instant approvals* |
 
 ---
 
@@ -161,6 +170,27 @@ This will:
 3. Safely register hooks in `%USERPROFILE%\.gemini\config\hooks.json`.
 4. Create an autostart shortcut in your Windows Startup folder.
 5. Launch the daemon in the background (`pythonw.exe`).
+
+#### Daily Workflow with Antigravity CLI (`agy`)
+
+Once `scripts\install.ps1` completes, **no additional setup is needed** in your day-to-day workflow. The bridge hooks directly into Antigravity's global lifecycle:
+
+1. **Run Antigravity CLI as usual**:
+   ```bash
+   agy
+   ```
+2. **Instant Desktop Interruption**:
+   Whenever your agent asks a multiple-choice question (`ask_question`) or requests execution permission (`ask_permission`), the dialog window automatically appears in focus on your screen.
+3. **One-Key Responses**:
+   - For questions: Type `1`, `2`, `3`... or navigate with `Tab` / `↑` / `↓` and press `Enter`.
+   - For permissions: Press `1` or `Enter` to Allow once, `2` for Conversation, `3` Globally, or `4` to Deny.
+4. **Minimizing to Background (`Esc`)**:
+   Pressing `Esc` or clicking `X` hides the dialog to your Windows System Tray (Taskbar Notification Area) without canceling or denying the request. A badge on the tray icon shows how many requests are waiting.
+5. **Verifying Daemon Status**:
+   To confirm the bridge daemon is running:
+   ```powershell
+   Get-Process pythonw | Where-Object { $_.CommandLine -like "*ag_attention_bridge*" }
+   ```
 
 #### Uninstallation on Windows
 
