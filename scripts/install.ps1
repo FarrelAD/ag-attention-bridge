@@ -163,9 +163,11 @@ if (-not $NoStartup) {
 if (-not $NoStart) {
     Write-Host "- Starting Ag Attention Bridge daemon in background..." -ForegroundColor Cyan
     # Stop existing instance if running
-    Get-Process -Name "pythonw", "python" -ErrorAction SilentlyContinue | Where-Object {
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
         $_.CommandLine -like "*ag_attention_bridge.app*"
-    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    } | ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
 
     Start-Process -FilePath $PythonwExe -ArgumentList "-m ag_attention_bridge.app" -WorkingDirectory $RepoRoot
     Start-Sleep -Milliseconds 500

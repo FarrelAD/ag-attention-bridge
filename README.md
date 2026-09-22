@@ -30,6 +30,7 @@ Surfaces `ask_question`, permissions, and approvals as an always-on-top modal di
   * `Esc`: Hide to system tray (**does not deny or cancel the interaction**; remains pending and accessible from tray).
 * **Persistent System Tray**: Dynamic numeric badge rendered into the tray icon via `QPainter`. Left-click to reopen pending requests; right-click context menu for quick controls.
 * **Multi-Session FIFO Queue**: Seamlessly queues interactions across multiple concurrent agent conversations.
+* **Customizable Appearance & Themes**: Built-in dark and light theme presets (`Midnight`, `OLED Pure Black`, `Nord`, and `Light`), custom accent colors (Sky Blue, Emerald, Amber, Violet, Rose), adjustable dialog width (560px–960px), and HiDPI font scaling. Accessible directly via the modal header (`⚙`) or the system tray menu (`Appearance & Settings...`).
 * **Ultra-Low Resource Footprint**: Pure event-driven Qt event loop with ~0% idle CPU and ~70–90MB RAM.
 
 ---

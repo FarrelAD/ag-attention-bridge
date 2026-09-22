@@ -45,6 +45,7 @@ SOCKET_PATH = (
 )
 GLOBAL_EVENTS_LOG_PATH = get_xdg_state_dir() / "events.jsonl"
 BRIDGE_LOG_PATH = get_xdg_state_dir() / "bridge.log"
+SETTINGS_PATH = get_xdg_state_dir() / "settings.json"
 
 # Explicit fallback disabled by default; set AG_ATTENTION_SYNTHETIC_FALLBACK=1 to enable
 SYNTHETIC_FALLBACK_ENABLED: bool = os.environ.get("AG_ATTENTION_SYNTHETIC_FALLBACK") == "1"

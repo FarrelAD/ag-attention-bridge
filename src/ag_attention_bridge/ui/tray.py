@@ -113,12 +113,14 @@ class AttentionTrayIcon(QSystemTrayIcon):
         self,
         on_open_pending: Callable[[], None] | None = None,
         on_toggle_current: Callable[[], None] | None = None,
+        on_open_settings: Callable[[], None] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self._pending_count = 0
         self._on_open_pending = on_open_pending
         self._on_toggle_current = on_toggle_current
+        self._on_open_settings = on_open_settings
 
         self._menu = QMenu()
         self._setup_menu()
@@ -138,6 +140,10 @@ class AttentionTrayIcon(QSystemTrayIcon):
         self._menu.addAction(self.action_toggle)
 
         self._menu.addSeparator()
+
+        self.action_settings = QAction("Appearance & Settings...", self)
+        self.action_settings.triggered.connect(self._handle_open_settings)
+        self._menu.addAction(self.action_settings)
 
         self.action_logs = QAction("Open Logs", self)
         self.action_logs.triggered.connect(self._open_logs)
@@ -181,6 +187,10 @@ class AttentionTrayIcon(QSystemTrayIcon):
     def _handle_toggle_current(self) -> None:
         if self._on_toggle_current:
             self._on_toggle_current()
+
+    def _handle_open_settings(self) -> None:
+        if self._on_open_settings:
+            self._on_open_settings()
 
     def _open_logs(self) -> None:
         state_dir = get_xdg_state_dir()

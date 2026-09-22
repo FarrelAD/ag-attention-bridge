@@ -8,9 +8,11 @@ Write-Host "=== Uninstalling Ag Attention Bridge from Windows ===" -ForegroundCo
 
 # 1. Stop running daemon
 Write-Host "- Stopping running daemon processes..." -ForegroundColor Cyan
-Get-Process -Name "pythonw", "python" -ErrorAction SilentlyContinue | Where-Object {
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
     $_.CommandLine -like "*ag_attention_bridge.app*"
-} | Stop-Process -Force -ErrorAction SilentlyContinue
+} | ForEach-Object {
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+}
 
 # 2. Remove hooks from %USERPROFILE%\.gemini\config\hooks.json
 $GeminiConfigDir = Join-Path $env:USERPROFILE ".gemini\config"

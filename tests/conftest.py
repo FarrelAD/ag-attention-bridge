@@ -21,3 +21,13 @@ def skip_linux_only_tests_on_windows(request):
         mod_name = request.module.__name__.split(".")[-1]
         if mod_name in LINUX_PROC_TESTS:
             pytest.skip("Test requires Linux /proc filesystem")
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app

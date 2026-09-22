@@ -3,10 +3,12 @@
 from ag_attention_bridge.ui.main_dialog import InteractionModal
 from ag_attention_bridge.ui.permission_view import PermissionView
 from ag_attention_bridge.ui.question_view import QuestionView
+from ag_attention_bridge.ui.settings_dialog import AppearanceSettingsDialog
 from ag_attention_bridge.ui.theme import apply_theme
 from ag_attention_bridge.ui.tray import AttentionTrayIcon, create_badged_icon
 
 __all__ = [
+    "AppearanceSettingsDialog",
     "AttentionTrayIcon",
     "InteractionModal",
     "PermissionView",

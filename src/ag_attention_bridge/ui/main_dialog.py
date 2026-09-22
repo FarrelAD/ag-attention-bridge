@@ -31,8 +31,10 @@ from ag_attention_bridge.domain.models import (
     QuestionItem,
     RequestType,
 )
+from ag_attention_bridge.settings import AppearanceSettings, load_settings
 from ag_attention_bridge.ui.permission_view import PermissionView
 from ag_attention_bridge.ui.question_view import QuestionView
+from ag_attention_bridge.ui.settings_dialog import AppearanceSettingsDialog
 from ag_attention_bridge.ui.theme import apply_theme
 
 logger = logging.getLogger("ag_attention_bridge.ui.modal")
@@ -46,16 +48,18 @@ class InteractionModal(QDialog):
     dismissed = Signal(str)  # (request_id) - hidden to tray without resolution
     native_step_resolved = Signal(str, object)  # (request_id, resolved_data_or_None)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, settings: AppearanceSettings | None = None) -> None:
         super().__init__(parent)
+        self.settings = settings or load_settings()
         self.current_request: InteractionRequest | None = None
         self._content_widget: QWidget | None = None
         self.resolver: Any = None
+        self._settings_dialog: AppearanceSettingsDialog | None = None
 
         self._setup_window()
         self._setup_layout()
         self.native_step_resolved.connect(self._on_native_step_resolved)
-        apply_theme(self)
+        self.apply_appearance(self.settings)
 
     def _setup_window(self) -> None:
         self.setWindowTitle("Ag Attention Bridge")
@@ -69,8 +73,28 @@ class InteractionModal(QDialog):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.setFixedWidth(720)
+        width = self.settings.dialog_width if hasattr(self, "settings") else 720
+        self.setFixedWidth(width)
         self.setMinimumHeight(280)
+
+    def apply_appearance(self, settings: AppearanceSettings) -> None:
+        """Apply appearance configuration to modal window and regenerate styling."""
+        self.settings = settings
+        self.setFixedWidth(settings.dialog_width)
+        self.setWindowOpacity(settings.window_opacity)
+        apply_theme(self, settings)
+
+    def open_appearance_settings(self) -> None:
+        """Open Appearance Settings dialog."""
+        if self._settings_dialog is None:
+            self._settings_dialog = AppearanceSettingsDialog(
+                current_settings=self.settings,
+                on_applied=self.apply_appearance,
+                parent=self,
+            )
+        self._settings_dialog.show()
+        self._settings_dialog.raise_()
+        self._settings_dialog.activateWindow()
 
     def _setup_layout(self) -> None:
         outer_layout = QVBoxLayout(self)
@@ -120,6 +144,14 @@ class InteractionModal(QDialog):
 
         header_layout.addLayout(brand_col)
         header_layout.addStretch()
+
+        # Appearance Settings button
+        self.btn_settings = QPushButton("⚙", self.header_frame)
+        self.btn_settings.setObjectName("HeaderSettingsBtn")
+        self.btn_settings.setToolTip("Customize Appearance & Themes")
+        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_settings.clicked.connect(self.open_appearance_settings)
+        header_layout.addWidget(self.btn_settings)
 
         # Close / Hide button
         self.btn_close = QPushButton("✕", self.header_frame)
@@ -213,7 +245,7 @@ class InteractionModal(QDialog):
             self.btn_submit.setObjectName("BtnAllow")
             self.btn_submit.setText("Allow Once (1 / ↵)")
             self.btn_submit.setDefault(True)
-            apply_theme(self)
+            apply_theme(self, self.settings)
         else:
             self._content_widget = QuestionView(request, self.scroll_container)
             self.btn_deny.setVisible(False)
@@ -222,7 +254,7 @@ class InteractionModal(QDialog):
             self.btn_submit.setObjectName("BtnSubmit")
             self.btn_submit.setText("Submit (Enter)")
             self.btn_submit.setDefault(True)
-            apply_theme(self)
+            apply_theme(self, self.settings)
 
         self.body_layout.addWidget(self._content_widget)
 

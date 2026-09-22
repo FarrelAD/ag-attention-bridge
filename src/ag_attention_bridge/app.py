@@ -119,10 +119,14 @@ def main() -> int:
 
     resolver = InteractionResolver()
 
+    # Load Appearance Settings
+    from ag_attention_bridge.settings import load_settings
+    appearance_settings = load_settings()
+
     # Interaction Modal
     from ag_attention_bridge.ui.main_dialog import InteractionModal
 
-    modal = InteractionModal()
+    modal = InteractionModal(settings=appearance_settings)
     modal.set_resolver(resolver)
 
     def present_active():
@@ -163,9 +167,13 @@ def main() -> int:
         else:
             present_active()
 
+    def on_open_settings():
+        modal.open_appearance_settings()
+
     tray = AttentionTrayIcon(
         on_open_pending=on_open_pending,
         on_toggle_current=on_toggle_current,
+        on_open_settings=on_open_settings,
     )
     tray.show()
 
