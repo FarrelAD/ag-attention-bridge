@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import socket
 import sys
-import time
+from pathlib import Path
 from typing import Any
 
 from ag_attention_bridge.config import SOCKET_PATH
 from ag_attention_bridge.ipc.protocol import (
     IpcMessage,
-    IpcResponse,
     decode_payload,
     encode_payload,
 )
+
+# Cross-platform fallback for AF_UNIX when running under non-POSIX
+AF_UNIX = getattr(socket, "AF_UNIX", socket.AF_INET)
 
 
 class IpcClient:
@@ -29,12 +30,12 @@ class IpcClient:
         if not os.path.exists(self.socket_path):
             return False
 
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock = socket.socket(AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.settimeout(0.2)
             sock.connect(self.socket_path)
             return True
-        except (socket.error, OSError):
+        except OSError:
             return False
         finally:
             try:
@@ -54,7 +55,7 @@ class IpcClient:
         if not os.path.exists(self.socket_path):
             return None
 
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock = socket.socket(AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.settimeout(timeout)
             sock.connect(self.socket_path)
@@ -77,10 +78,10 @@ class IpcClient:
                 return decode_payload(buffer)
 
             return None
-        except socket.timeout:
+        except TimeoutError:
             sys.stderr.write(f"[ag-ipc-client] Request timed out after {timeout}s\n")
             return None
-        except (socket.error, OSError) as e:
+        except OSError as e:
             sys.stderr.write(f"[ag-ipc-client] Connection error: {e}\n")
             return None
         finally:
@@ -94,7 +95,7 @@ class IpcClient:
         if not os.path.exists(self.socket_path):
             return False
 
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock = socket.socket(AF_UNIX, socket.SOCK_STREAM)
         try:
             sock.settimeout(1.0)
             sock.connect(self.socket_path)

@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from enum import Enum
 import json
-from typing import Any
 import uuid
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 PROTOCOL_VERSION = "1.0"
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     SUBMIT_REQUEST = "SUBMIT_REQUEST"
     RESOLVE_REQUEST = "RESOLVE_REQUEST"
     GET_QUEUE = "GET_QUEUE"
@@ -22,7 +22,6 @@ class MessageType(str, Enum):
     CHECK_WAITING = "CHECK_WAITING"
     ACK = "ACK"
     ERROR = "ERROR"
-
 
 
 @dataclass
@@ -72,9 +71,9 @@ def encode_payload(data: dict[str, Any] | IpcMessage | IpcResponse) -> bytes:
     return json.dumps(obj, separators=(",", ":")).encode("utf-8") + b"\n"
 
 
-def decode_payload(line: str | bytes) -> dict[str, Any]:
+def decode_payload(line: str | bytes | bytearray) -> dict[str, Any]:
     """Parse a single line of JSON into a dict."""
-    if isinstance(line, bytes):
+    if isinstance(line, bytes | bytearray):
         line = line.decode("utf-8")
     line = line.strip()
     if not line:

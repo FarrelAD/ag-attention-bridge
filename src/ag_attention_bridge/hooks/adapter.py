@@ -8,15 +8,19 @@ and returns valid Antigravity hook responses on stdout.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import fcntl
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
 
 from ag_attention_bridge.config import (
     GLOBAL_EVENTS_LOG_PATH,
@@ -52,7 +56,7 @@ def format_observation_record(
     response: dict[str, Any],
 ) -> dict[str, Any]:
     """Build a structured observation record with microsecond timestamp."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return {
         "timestamp": now,
         "pid": os.getpid(),
@@ -90,7 +94,9 @@ def write_observation_log(record: dict[str, Any]) -> None:
         sys.stderr.write(f"[ag-hook-adapter] Error writing local log: {e}\n")
 
 
-def generate_default_response(event_type: str, payload: dict[str, Any], reason_suffix: str = "") -> dict[str, Any]:
+def generate_default_response(
+    event_type: str, payload: dict[str, Any], reason_suffix: str = ""
+) -> dict[str, Any]:
     """Generate default compliant Antigravity hook response."""
     if event_type == "PreToolUse":
         tool_name = payload.get("toolCall", {}).get("name", "")
@@ -121,13 +127,16 @@ def ensure_daemon_running(client: IpcClient, timeout: float = 3.0) -> bool:
     spawn_lock_path = get_xdg_runtime_dir() / "ag-spawn.lock"
     lock_fd = None
     should_spawn = False
-    try:
-        lock_fd = os.open(str(spawn_lock_path), os.O_CREAT | os.O_RDWR, 0o600)
-        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    if fcntl is not None:
+        try:
+            lock_fd = os.open(str(spawn_lock_path), os.O_CREAT | os.O_RDWR, 0o600)
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
+            should_spawn = True
+        except (BlockingIOError, OSError):
+            # Another process is currently spawning the daemon! Just wait for socket.
+            should_spawn = False
+    else:
         should_spawn = True
-    except (BlockingIOError, OSError):
-        # Another process is currently spawning the daemon! Just wait for socket.
-        should_spawn = False
 
     if should_spawn:
         repo_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -160,7 +169,8 @@ def ensure_daemon_running(client: IpcClient, timeout: float = 3.0) -> bool:
         if client.is_available():
             if lock_fd is not None:
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    if fcntl is not None:
+                        fcntl.flock(lock_fd, fcntl.LOCK_UN)  # type: ignore[attr-defined]
                     os.close(lock_fd)
                 except Exception:
                     pass
@@ -169,7 +179,8 @@ def ensure_daemon_running(client: IpcClient, timeout: float = 3.0) -> bool:
 
     if lock_fd is not None:
         try:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)  # type: ignore[attr-defined]
             os.close(lock_fd)
         except Exception:
             pass
@@ -263,7 +274,9 @@ def handle_hook(
                 conversation_id=conv_id,
                 payload=notify_payload,
             )
-            ipc_resp = client.send_and_wait(msg, timeout=float(os.environ.get("AG_ATTENTION_TIMEOUT", "3600.0")))
+            ipc_resp = client.send_and_wait(
+                msg, timeout=float(os.environ.get("AG_ATTENTION_TIMEOUT", "3600.0"))
+            )
             if ipc_resp and ipc_resp.get("status") == "ok":
                 data = ipc_resp.get("data", {})
                 if "decision" in data:
@@ -272,8 +285,12 @@ def handle_hook(
                 else:
                     response = generate_default_response(event_type, payload, "Daemon acknowledged")
             else:
-                sys.stderr.write("[ag-hook-adapter] Daemon response timed out; falling back to IDE\n")
-                response = generate_default_response(event_type, payload, "Fallback: daemon timeout")
+                sys.stderr.write(
+                    "[ag-hook-adapter] Daemon response timed out; falling back to IDE\n"
+                )
+                response = generate_default_response(
+                    event_type, payload, "Fallback: daemon timeout"
+                )
 
         log_bridge_diagnostic(
             conversation_id=conv_id,

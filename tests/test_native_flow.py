@@ -6,6 +6,7 @@ import json
 import os
 import threading
 import time
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -14,13 +15,9 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from ag_attention_bridge.antigravity.client import AntigravityClient
-from ag_attention_bridge.antigravity.discovery import AntigravityDiscovery
 from ag_attention_bridge.antigravity.interaction_resolver import InteractionResolver
 from ag_attention_bridge.antigravity.models import (
     AntigravityServer,
-    PermissionScope,
-    QuestionEntry,
-    QuestionOption,
     SubmissionState,
 )
 from ag_attention_bridge.domain.models import (
@@ -68,41 +65,52 @@ def test_e2e_native_ask_question_flow(qapp, tmp_path, monkeypatch):
             self.server = server
 
         def build_ask_question_payload(self, trajectory_id, step_index, responses, cancelled=False):
-            return AntigravityClient.build_ask_question_payload(trajectory_id, step_index, responses, cancelled)
+            return AntigravityClient.build_ask_question_payload(
+                trajectory_id, step_index, responses, cancelled
+            )
 
         def handle_cascade_user_interaction(self, cascade_id, payload):
             rpc_calls.append((cascade_id, payload))
             return {"status": "ok"}
 
         def find_waiting_interaction(self, cascade_id, max_retries=5, retry_delays=None):
-            return ("traj-e2e-123", 42, {
-                "status": "CORTEX_STEP_STATUS_WAITING",
-                "type": "CORTEX_STEP_TYPE_ASK_QUESTION",
-                "askQuestion": {
-                    "questions": [
-                        {
-                            "question": "Which database do you prefer?",
-                            "options": [
-                                {"id": "opt-1", "text": "PostgreSQL"},
-                                {"id": "opt-2", "text": "SQLite"},
-                            ],
-                        }
-                    ]
+            return (
+                "traj-e2e-123",
+                42,
+                {
+                    "status": "CORTEX_STEP_STATUS_WAITING",
+                    "type": "CORTEX_STEP_TYPE_ASK_QUESTION",
+                    "askQuestion": {
+                        "questions": [
+                            {
+                                "question": "Which database do you prefer?",
+                                "options": [
+                                    {"id": "opt-1", "text": "PostgreSQL"},
+                                    {"id": "opt-2", "text": "SQLite"},
+                                ],
+                            }
+                        ]
+                    },
                 },
-            })
+            )
 
-    mock_server = AntigravityServer(pid=123, workspace_id="ws_e2e", https_port=4000, csrf_token="tok")
+    mock_server = AntigravityServer(
+        pid=123, workspace_id="ws_e2e", https_port=4000, csrf_token="tok"
+    )
 
     class MockDiscovery:
         def discover_servers(self, force=False):
             return [mock_server]
+
         def find_server_for_workspace(self, path):
             return mock_server
 
     resolver = InteractionResolver(discovery=MockDiscovery())
     resolver._client_cache[123] = MockConnectRpcClient(mock_server)
 
-    server = IpcServer(queue, sessions, injections=injections, socket_path=socket_path, resolver=resolver)
+    server = IpcServer(
+        queue, sessions, injections=injections, socket_path=socket_path, resolver=resolver
+    )
     assert server.start() is True
 
     modal = InteractionModal()
@@ -171,6 +179,7 @@ def test_e2e_native_ask_question_flow(qapp, tmp_path, monkeypatch):
 
     # Wait for background native resolution to reach NATIVE_WAITING_READY
     from ag_attention_bridge.antigravity.models import InteractionState
+
     assert _process_events_until(lambda: req.state == InteractionState.NATIVE_WAITING_READY)
     assert req.trajectory_id == "traj-e2e-123"
     assert req.step_index == 42
@@ -178,14 +187,16 @@ def test_e2e_native_ask_question_flow(qapp, tmp_path, monkeypatch):
     # 4. User selects option [2] (SQLite) and presses Enter
     # Wait for initial load debounce
     time.sleep(0.25)
-    from PySide6.QtGui import QKeyEvent
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QKeyEvent
 
     key_2 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_2, Qt.KeyboardModifier.NoModifier, "2")
     modal.keyPressEvent(key_2)
 
     # Press Enter
-    key_enter = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+    key_enter = QKeyEvent(
+        QKeyEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier
+    )
     modal.keyPressEvent(key_enter)
 
     # 5. Verify HandleCascadeUserInteraction was called with exact native options!
@@ -221,7 +232,9 @@ def test_enter_guard_and_authoritative_option_ids(qapp):
             pass
 
         def build_ask_question_payload(self, trajectory_id, step_index, responses, cancelled=False):
-            return AntigravityClient.build_ask_question_payload(trajectory_id, step_index, responses, cancelled)
+            return AntigravityClient.build_ask_question_payload(
+                trajectory_id, step_index, responses, cancelled
+            )
 
         def handle_cascade_user_interaction(self, cascade_id, payload):
             rpc_calls.append((cascade_id, payload))
@@ -229,28 +242,35 @@ def test_enter_guard_and_authoritative_option_ids(qapp):
 
         def find_waiting_interaction(self, cascade_id, max_retries=5, retry_delays=None):
             # Authoritative server-side option IDs (e.g. "backend-go-456")
-            return ("traj-guard-1", 10, {
-                "status": "CORTEX_STEP_STATUS_WAITING",
-                "type": "CORTEX_STEP_TYPE_ASK_QUESTION",
-                "askQuestion": {
-                    "questions": [
-                        {
-                            "question": "Which backend?",
-                            "options": [
-                                {"id": "backend-fastapi-123", "text": "FastAPI"},
-                                {"id": "backend-go-456", "text": "Go"},
-                                {"id": "backend-rust-789", "text": "Rust"},
-                            ],
-                        }
-                    ]
+            return (
+                "traj-guard-1",
+                10,
+                {
+                    "status": "CORTEX_STEP_STATUS_WAITING",
+                    "type": "CORTEX_STEP_TYPE_ASK_QUESTION",
+                    "askQuestion": {
+                        "questions": [
+                            {
+                                "question": "Which backend?",
+                                "options": [
+                                    {"id": "backend-fastapi-123", "text": "FastAPI"},
+                                    {"id": "backend-go-456", "text": "Go"},
+                                    {"id": "backend-rust-789", "text": "Rust"},
+                                ],
+                            }
+                        ]
+                    },
                 },
-            })
+            )
 
-    mock_server = AntigravityServer(pid=999, workspace_id="ws_guard", https_port=4000, csrf_token="tok")
+    mock_server = AntigravityServer(
+        pid=999, workspace_id="ws_guard", https_port=4000, csrf_token="tok"
+    )
 
     class MockDiscovery:
         def discover_servers(self, force=False):
             return [mock_server]
+
         def find_server_for_workspace(self, path):
             return mock_server
 

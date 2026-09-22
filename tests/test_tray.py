@@ -1,12 +1,14 @@
 """Tests for system tray icon and badge rendering."""
 
 import os
+
 import pytest
 
 # Ensure headless execution for Qt in CI / test runner
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtWidgets import QApplication
+
 from ag_attention_bridge.ui.tray import AttentionTrayIcon, create_badged_icon
 
 

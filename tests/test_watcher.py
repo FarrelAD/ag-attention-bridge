@@ -1,6 +1,7 @@
 """Unit tests for AntigravityProcessWatcher."""
 
 import os
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -23,6 +24,8 @@ def qapp():
 
 
 def test_is_antigravity_running_real_system():
+    if not os.path.exists("/proc"):
+        pytest.skip("/proc filesystem only exists on Linux")
     # On this machine, Antigravity IDE is currently active
     assert is_antigravity_running("antigravity-ide") is True
     # Non-existent process returns False
@@ -44,6 +47,7 @@ def test_antigravity_process_watcher_signal(qapp, monkeypatch):
 
     # Process events to let timer fire twice
     import time
+
     for _ in range(10):
         QCoreApplication.processEvents()
         if exited_signals:

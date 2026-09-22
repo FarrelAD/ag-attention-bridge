@@ -2,15 +2,14 @@
 
 import json
 import time
-from pathlib import Path
+
+import pytest
 
 from ag_attention_bridge.hooks.adapter import (
     detect_event_type,
-    generate_default_response,
     handle_hook,
 )
 from ag_attention_bridge.ipc.client import IpcClient
-import pytest
 
 
 @pytest.fixture(autouse=True)
@@ -22,7 +21,9 @@ def isolate_adapter_unit_tests(monkeypatch, tmp_path):
     )
     # Ensure IpcClient does not hit any real system socket
     fake_sock = tmp_path / "isolated.sock"
-    monkeypatch.setattr("ag_attention_bridge.hooks.adapter.IpcClient", lambda: IpcClient(socket_path=fake_sock))
+    monkeypatch.setattr(
+        "ag_attention_bridge.hooks.adapter.IpcClient", lambda: IpcClient(socket_path=fake_sock)
+    )
 
 
 def test_detect_event_type():
@@ -161,5 +162,3 @@ def test_handle_hook_malformed_and_empty():
     res_bad_json, code_bad = handle_hook("NOT_VALID_JSON{{{")
     assert code_bad == 0
     assert res_bad_json == {}
-
-

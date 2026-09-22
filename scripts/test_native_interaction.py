@@ -14,7 +14,6 @@ import argparse
 import json
 import sys
 import time
-from typing import Any
 
 from ag_attention_bridge.antigravity.client import AntigravityClient
 from ag_attention_bridge.antigravity.discovery import AntigravityDiscovery
@@ -81,12 +80,14 @@ def main() -> int:
     if args.workspace:
         server = discovery.find_server_for_workspace(args.workspace)
         if not server:
-            print(f"[-] No server found specifically for workspace '{args.workspace}'. Using first available.")
+            print(
+                f"[-] No server found specifically for workspace '{args.workspace}'. Using first available."
+            )
             server = servers[0]
     else:
         server = servers[0]
 
-    print(f"[+] Found Language Server:")
+    print("[+] Found Language Server:")
     print(f"    • PID:            {server.pid}")
     print(f"    • HTTPS Port:     {server.https_port}")
     print(f"    • Workspace ID:   {server.workspace_id}")
@@ -157,14 +158,18 @@ def main() -> int:
     step_type = step_data.get("type", "UNKNOWN")
     short_traj = f"{traj_id[:8]}...{traj_id[-4:]}" if len(traj_id) > 12 else traj_id
 
-    print(f"[+] Waiting Step Located!")
+    print("[+] Waiting Step Located!")
     print(f"    • Trajectory ID:  {short_traj}")
     print(f"    • Step Index:     {step_idx}")
     print(f"    • Step Type:      {step_type}")
 
     # Check for askQuestion
     ask_q = step_data.get("askQuestion") or step_data.get("ask_question")
-    perm = step_data.get("permission") or step_data.get("runCommand") or step_data.get("filePermission")
+    perm = (
+        step_data.get("permission")
+        or step_data.get("runCommand")
+        or step_data.get("filePermission")
+    )
 
     if ask_q:
         raw_questions = ask_q.get("questions", [])
@@ -198,10 +203,13 @@ def main() -> int:
             else:
                 selected_id = options[0]["id"] if options else "0"
 
-        print(f"\n[5/5] Submitting native response via HandleCascadeUserInteraction...")
+        print("\n[5/5] Submitting native response via HandleCascadeUserInteraction...")
         q_entry = QuestionEntry(
             question=q_text,
-            options=[QuestionOption(id=o.get("id", str(i)), text=o.get("text", "")) for i, o in enumerate(options)],
+            options=[
+                QuestionOption(id=o.get("id", str(i)), text=o.get("text", ""))
+                for i, o in enumerate(options)
+            ],
             is_multi_select=is_multi,
             selected_option_ids=[selected_id] if not write_in else [],
             write_in_response=write_in,

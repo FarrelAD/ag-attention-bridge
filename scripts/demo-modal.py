@@ -32,7 +32,9 @@ def main() -> int:
         title="Which web framework architecture would you prefer for the new API?",
         body="Which web framework architecture would you prefer for the new API?",
         options=[
-            InteractionOption(id="1", label="FastAPI (Asynchronous, High Throughput, OpenAPI built-in)"),
+            InteractionOption(
+                id="1", label="FastAPI (Asynchronous, High Throughput, OpenAPI built-in)"
+            ),
             InteractionOption(id="2", label="Go / Gin (Compiled, Extremely Low Memory Footprint)"),
             InteractionOption(id="3", label="Rust / Axum (Zero Cost Abstractions, Memory Safe)"),
         ],
@@ -70,7 +72,9 @@ def main() -> int:
         load_current()
 
     def on_dismissed(req_id: str):
-        print(f"[Demo] Request {req_id} dismissed to tray (remains pending). Click tray icon to restore.")
+        print(
+            f"[Demo] Request {req_id} dismissed to tray (remains pending). Click tray icon to restore."
+        )
 
     modal.resolved.connect(on_resolved)
     modal.dismissed.connect(on_dismissed)

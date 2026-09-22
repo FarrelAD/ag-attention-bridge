@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
@@ -23,7 +23,6 @@ from ag_attention_bridge.domain.models import (
     PendingAnswerItem,
     PendingInjection,
     QuestionItem,
-    RequestStatus,
     RequestType,
     format_injected_message,
 )
@@ -89,7 +88,9 @@ class IpcServer(QObject):
         Path(self.socket_path).parent.mkdir(parents=True, exist_ok=True)
 
         if not self._server.listen(self.socket_path):
-            logger.error("Failed to start IPC server on %s: %s", self.socket_path, self._server.errorString())
+            logger.error(
+                "Failed to start IPC server on %s: %s", self.socket_path, self._server.errorString()
+            )
             return False
 
         logger.info("IPC server listening on %s", self.socket_path)
@@ -118,6 +119,8 @@ class IpcServer(QObject):
 
         def _worker():
             try:
+                if self.resolver is None:
+                    return
                 waiting_list = self.resolver.scan_waiting_interactions()
                 for cid, resolved in waiting_list:
                     ws_path = resolved.get("workspace_path")
@@ -239,7 +242,9 @@ class IpcServer(QObject):
         else:
             self._send_to_socket(
                 socket,
-                IpcResponse(reply_to=msg_id, status="error", error=f"Unknown message type: {msg_type}"),
+                IpcResponse(
+                    reply_to=msg_id, status="error", error=f"Unknown message type: {msg_type}"
+                ),
             )
 
     def _handle_check_waiting(
@@ -273,6 +278,8 @@ class IpcServer(QObject):
 
         def _worker():
             try:
+                if self.resolver is None:
+                    return
                 resolved = self.resolver.resolve_authoritative_waiting_interaction(
                     cascade_id=conversation_id,
                     workspace_path=ws_path,
@@ -288,7 +295,9 @@ class IpcServer(QObject):
                         },
                     )
             except Exception as e:
-                logger.warning("Error in background check_waiting worker for %s: %s", conversation_id, e)
+                logger.warning(
+                    "Error in background check_waiting worker for %s: %s", conversation_id, e
+                )
             finally:
                 self._checking_conversations.discard(conversation_id)
 
@@ -334,10 +343,7 @@ class IpcServer(QObject):
             native_questions = resolved.get("questions", [])
             parsed_questions: list[QuestionItem] = []
             for idx, nq in enumerate(native_questions):
-                parsed_opts = [
-                    InteractionOption(id=opt.id, label=opt.text)
-                    for opt in nq.options
-                ]
+                parsed_opts = [InteractionOption(id=opt.id, label=opt.text) for opt in nq.options]
                 parsed_questions.append(
                     QuestionItem(
                         id=str(idx),
@@ -348,7 +354,11 @@ class IpcServer(QObject):
                     )
                 )
             if parsed_questions:
-                title = parsed_questions[0].question if len(parsed_questions) == 1 else f"Questions ({len(parsed_questions)} items)"
+                title = (
+                    parsed_questions[0].question
+                    if len(parsed_questions) == 1
+                    else f"Questions ({len(parsed_questions)} items)"
+                )
                 body = parsed_questions[0].question
                 options = parsed_questions[0].options
                 multi_select = parsed_questions[0].multi_select
@@ -432,7 +442,7 @@ class IpcServer(QObject):
             for idx, q_dict in enumerate(raw_questions):
                 if not isinstance(q_dict, dict):
                     continue
-                q_text = q_dict.get("question", f"Question {idx+1}")
+                q_text = q_dict.get("question", f"Question {idx + 1}")
                 raw_opts = q_dict.get("options", [])
                 if isinstance(raw_opts, str):
                     try:
@@ -442,7 +452,11 @@ class IpcServer(QObject):
                 opts = []
                 for o_idx, opt in enumerate(raw_opts):
                     if isinstance(opt, dict):
-                        opts.append(InteractionOption(id=str(opt.get("id", o_idx)), label=str(opt.get("label", opt))))
+                        opts.append(
+                            InteractionOption(
+                                id=str(opt.get("id", o_idx)), label=str(opt.get("label", opt))
+                            )
+                        )
                     else:
                         opts.append(InteractionOption(id=str(o_idx), label=str(opt)))
                 multi_sel = bool(q_dict.get("is_multi_select", False))
@@ -459,7 +473,11 @@ class IpcServer(QObject):
                 )
 
             if parsed_questions:
-                title = parsed_questions[0].question if len(parsed_questions) == 1 else f"Questions ({len(parsed_questions)} items)"
+                title = (
+                    parsed_questions[0].question
+                    if len(parsed_questions) == 1
+                    else f"Questions ({len(parsed_questions)} items)"
+                )
                 body = parsed_questions[0].question
                 options = parsed_questions[0].options
                 multi_select = parsed_questions[0].multi_select
@@ -506,7 +524,9 @@ class IpcServer(QObject):
             if cmd:
                 cmd_str = str(cmd).strip()
                 permission_overrides.append(f"command({cmd_str})")
-            target_val = tool_args.get("target") or tool_args.get("Target") or tool_args.get("TargetFile")
+            target_val = (
+                tool_args.get("target") or tool_args.get("Target") or tool_args.get("TargetFile")
+            )
             if target_val:
                 t_str = str(target_val).strip()
                 act = tool_args.get("action") or tool_args.get("Action") or tool_name
@@ -537,9 +557,11 @@ class IpcServer(QObject):
         )
 
         # Attempt fast resolution of live waiting step
-        if getattr(self, "resolver", None) is not None:
+        if self.resolver is not None:
             try:
-                waiting = self.resolver.resolve_waiting_step(conversation_id, workspace_path=ws_path, max_retries=1)
+                waiting = self.resolver.resolve_waiting_step(
+                    conversation_id, workspace_path=ws_path, max_retries=1
+                )
                 if waiting:
                     traj_id, s_idx, _ = waiting
                     interaction_req.trajectory_id = traj_id
@@ -566,7 +588,10 @@ class IpcServer(QObject):
             resp = IpcResponse(
                 reply_to=msg_id,
                 status="ok",
-                data={"status": "enqueued" if enqueued else "deduplicated", "request_id": request_id},
+                data={
+                    "status": "enqueued" if enqueued else "deduplicated",
+                    "request_id": request_id,
+                },
             )
             self._send_to_socket(socket, resp)
             if enqueued:
@@ -594,7 +619,7 @@ class IpcServer(QObject):
         logger.info("[REQ %s] IPC future resolved with: %s", request_id, response_value)
 
         # Submit natively if resolver is present and interaction has not been submitted
-        if getattr(self, "resolver", None) is not None:
+        if self.resolver is not None:
             try:
                 self.resolver.submit_interaction(
                     cascade_id=req.conversation_id,
@@ -611,7 +636,7 @@ class IpcServer(QObject):
         waiting = self._pending_responses.pop(request_id, None)
         if waiting:
             client_socket, client_msg_id = waiting
-            # Build tool-appropriate hook output
+            decision_data: dict[str, Any]
             if req.request_type == RequestType.PERMISSION:
                 is_allow = str(response_value).lower() in ("allow", "yes", "true")
                 if is_allow:
@@ -641,7 +666,9 @@ class IpcServer(QObject):
                                 sel = [sel]
                             items.append(PendingAnswerItem(question=q_text, selected=sel))
                         else:
-                            items.append(PendingAnswerItem(question=req.title, selected=[str(item)]))
+                            items.append(
+                                PendingAnswerItem(question=req.title, selected=[str(item)])
+                            )
                 elif isinstance(response_value, dict):
                     q_text = response_value.get("question", req.title)
                     sel = response_value.get("selected", [])
@@ -649,7 +676,9 @@ class IpcServer(QObject):
                         sel = [sel]
                     items.append(PendingAnswerItem(question=q_text, selected=sel))
                 else:
-                    items.append(PendingAnswerItem(question=req.title, selected=[str(response_value)]))
+                    items.append(
+                        PendingAnswerItem(question=req.title, selected=[str(response_value)])
+                    )
 
                 # 2. Store pending injection for PreInvocation
                 injection = PendingInjection(
@@ -669,7 +698,9 @@ class IpcServer(QObject):
                 request_id=request_id,
                 conversation_id=req.conversation_id,
                 hook_event="PreToolUse",
-                tool_name="ask_question" if req.request_type == RequestType.QUESTION else "permission",
+                tool_name="ask_question"
+                if req.request_type == RequestType.QUESTION
+                else "permission",
                 request_state="answered",
                 ui_action=str(response_value),
                 ipc_state="response_transmitted",
@@ -784,26 +815,32 @@ class IpcServer(QObject):
         if not ok:
             self._send_to_socket(
                 resolver_socket,
-                IpcResponse(reply_to=msg_id, status="error", error=f"Request {request_id} not found"),
+                IpcResponse(
+                    reply_to=msg_id, status="error", error=f"Request {request_id} not found"
+                ),
             )
             return
 
         # ACK resolver
         self._send_to_socket(
             resolver_socket,
-            IpcResponse(reply_to=msg_id, status="ok", data={"request_id": request_id, "resolved": True}),
+            IpcResponse(
+                reply_to=msg_id, status="ok", data={"request_id": request_id, "resolved": True}
+            ),
         )
 
     def _handle_get_queue(self, socket: QLocalSocket, msg_id: str) -> None:
         items = []
         for req in self.queue.get_pending_list():
-            items.append({
-                "request_id": req.request_id,
-                "conversation_id": req.conversation_id,
-                "type": req.request_type.value,
-                "title": req.title,
-                "status": req.status.value,
-            })
+            items.append(
+                {
+                    "request_id": req.request_id,
+                    "conversation_id": req.conversation_id,
+                    "type": req.request_type.value,
+                    "title": req.title,
+                    "status": req.status.value,
+                }
+            )
         resp = IpcResponse(
             reply_to=msg_id,
             status="ok",

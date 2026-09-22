@@ -1,8 +1,10 @@
 """Integration tests for IPC client and Qt-based IPC server."""
 
 import os
+import sys
 import threading
 import time
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -25,6 +27,8 @@ def qapp():
 
 
 def test_ipc_server_lifecycle(qapp, tmp_path):
+    if sys.platform == "win32":
+        pytest.skip("QLocalServer / Unix domain socket files are POSIX-only")
     socket_path = tmp_path / "test-bridge.sock"
     queue = RequestQueue()
     sessions = SessionStore()
@@ -41,6 +45,8 @@ def test_ipc_server_lifecycle(qapp, tmp_path):
 
 
 def test_ipc_submit_and_resolve_roundtrip(qapp, tmp_path):
+    if sys.platform == "win32":
+        pytest.skip("QLocalServer / Unix domain socket files are POSIX-only")
     socket_path = tmp_path / "test-bridge-roundtrip.sock"
     queue = RequestQueue()
     sessions = SessionStore()

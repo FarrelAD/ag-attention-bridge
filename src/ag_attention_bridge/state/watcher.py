@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -31,7 +30,11 @@ def is_antigravity_running(process_name: str = "antigravity-ide") -> bool:
             # Check cmdline as fallback
             cmdline_file = entry / "cmdline"
             if cmdline_file.exists():
-                cmdline = cmdline_file.read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="ignore")
+                cmdline = (
+                    cmdline_file.read_bytes()
+                    .replace(b"\x00", b" ")
+                    .decode("utf-8", errors="ignore")
+                )
                 if process_name in cmdline:
                     return True
         except (PermissionError, FileNotFoundError, ProcessLookupError):

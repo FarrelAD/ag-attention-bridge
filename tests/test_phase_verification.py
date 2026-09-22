@@ -4,6 +4,8 @@ import json
 import os
 import threading
 import time
+from typing import Any
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -12,11 +14,8 @@ from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QApplication
 
 from ag_attention_bridge.domain.models import (
-    InteractionOption,
-    InteractionRequest,
     PendingAnswerItem,
     PendingInjection,
-    QuestionItem,
     RequestType,
     format_injected_message,
 )
@@ -84,7 +83,9 @@ def test_phase1_controlled_run_command_allow(qapp, tmp_path, monkeypatch):
 
     def _run_hook():
         # Handle hook directly using adapter
-        resp, code = handle_hook(json.dumps(raw_payload), "PreToolUse", ipc_client=client, auto_start=False)
+        resp, code = handle_hook(
+            json.dumps(raw_payload), "PreToolUse", ipc_client=client, auto_start=False
+        )
         resp_container["response"] = resp
         resp_container["code"] = code
 
@@ -136,10 +137,10 @@ def test_phase2_real_tools_interception(qapp, tmp_path):
                 "toolCall": {"name": tool_name, "args": tool_args},
             },
         )
-        res_box = {}
+        res_box: dict[str, Any] = {}
 
-        def _send(m=msg):
-            res_box["resp"] = client.send_and_wait(m, timeout=5.0)
+        def _send(m=msg, box=res_box):
+            box["resp"] = client.send_and_wait(m, timeout=5.0)
 
         t = threading.Thread(target=_send)
         t.start()
@@ -150,7 +151,7 @@ def test_phase2_real_tools_interception(qapp, tmp_path):
         assert req.request_type == RequestType.PERMISSION
 
         server.resolve_request(req_id, "allow")
-        _process_events_until(lambda: "resp" in res_box)
+        _process_events_until(lambda b=res_box: "resp" in b)
         t.join(timeout=2.0)
 
         assert res_box["resp"]["data"]["decision"] == "allow"

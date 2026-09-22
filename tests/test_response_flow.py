@@ -3,6 +3,7 @@
 import os
 import threading
 import time
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -55,7 +56,6 @@ def _client_send(client, msg, timeout=5.0):
 
 class TestPermissionBridgeResponseFlow:
     """Verify that permission requests produce valid Antigravity hook JSON responses."""
-
 
     def test_permission_allow_returns_valid_hook_json(self, qapp, tmp_path):
         """Allow button → hook adapter receives {"decision": "allow"} immediately."""
@@ -157,7 +157,9 @@ class TestPermissionBridgeResponseFlow:
 class TestQuestionBridgeResponseFlow:
     """Verify ask_question bypasses native UI and injects answer via PreInvocation."""
 
-    def test_question_single_select_returns_deny_and_injects_preinvocation(self, qapp, tmp_path, monkeypatch):
+    def test_question_single_select_returns_deny_and_injects_preinvocation(
+        self, qapp, tmp_path, monkeypatch
+    ):
         monkeypatch.setattr("ag_attention_bridge.ipc.server.SYNTHETIC_FALLBACK_ENABLED", True)
         socket_path = tmp_path / "test-q-single.sock"
         queue = RequestQueue()
@@ -203,7 +205,9 @@ class TestQuestionBridgeResponseFlow:
         assert req.title == "Which framework should we use?"
 
         # Simulate user selecting "Vue"
-        server.resolve_request("q-single-1", [{"question": "Which framework should we use?", "selected": ["Vue"]}])
+        server.resolve_request(
+            "q-single-1", [{"question": "Which framework should we use?", "selected": ["Vue"]}]
+        )
         _process_events_until(lambda: bool(client_result.get("resp")), max_iters=30)
 
         t.join(timeout=2.0)
@@ -224,7 +228,6 @@ class TestQuestionBridgeResponseFlow:
         assert "Vue" in pre_inv["data"]["injectSteps"][0]["userMessage"]
 
         server.stop()
-
 
     def test_esc_hides_but_request_stays_pending(self, qapp, tmp_path):
         """Esc/close should NOT resolve the request — adapter keeps waiting."""

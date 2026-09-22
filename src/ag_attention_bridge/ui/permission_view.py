@@ -73,7 +73,9 @@ class PermissionView(QWidget):
         header_row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         lbl_action_tag = QLabel("ACTION REQUIRED", self)
-        lbl_action_tag.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;")
+        lbl_action_tag.setStyleSheet(
+            "color: #94a3b8; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;"
+        )
         lbl_action_tag.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         header_row.addWidget(lbl_action_tag, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -94,7 +96,9 @@ class PermissionView(QWidget):
         target_layout.setContentsMargins(12, 10, 12, 10)
 
         lbl_target_heading = QLabel("TARGET / COMMAND", target_box)
-        lbl_target_heading.setStyleSheet("color: #64748b; font-size: 10px; font-weight: bold; letter-spacing: 0.5px;")
+        lbl_target_heading.setStyleSheet(
+            "color: #64748b; font-size: 10px; font-weight: bold; letter-spacing: 0.5px;"
+        )
         target_layout.addWidget(lbl_target_heading)
 
         self.lbl_target = QLabel(self._target_text, target_box)
@@ -113,7 +117,9 @@ class PermissionView(QWidget):
             reason_layout.setSpacing(4)
 
             lbl_reason_heading = QLabel("REASON", reason_box)
-            lbl_reason_heading.setStyleSheet("color: #94a3b8; font-size: 10px; font-weight: bold; letter-spacing: 0.5px;")
+            lbl_reason_heading.setStyleSheet(
+                "color: #94a3b8; font-size: 10px; font-weight: bold; letter-spacing: 0.5px;"
+            )
             reason_layout.addWidget(lbl_reason_heading)
 
             self.lbl_reason = QLabel(self._reason_text, reason_box)

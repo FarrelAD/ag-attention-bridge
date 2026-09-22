@@ -6,14 +6,13 @@ import io
 import json
 import urllib.error
 import urllib.request
+
 import pytest
 
 from ag_attention_bridge.antigravity.client import AntigravityClient
 from ag_attention_bridge.antigravity.errors import (
     InteractionStaleError,
-    InteractionSubmissionError,
     SecurityValidationError,
-    ServerConnectionError,
 )
 from ag_attention_bridge.antigravity.models import (
     AntigravityServer,
@@ -163,10 +162,13 @@ def test_call_rpc_success(mock_server, monkeypatch):
     class MockResponse:
         def __init__(self):
             self.data = json.dumps({"status": "success", "result": 123}).encode("utf-8")
+
         def read(self):
             return self.data
+
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
 
@@ -192,9 +194,7 @@ def test_stale_interaction_error_detection(mock_server, monkeypatch):
 
     def mock_urlopen_stale(req, *args, **kwargs):
         fp = io.BytesIO(b'{"error": "input not registered for step 15"}')
-        raise urllib.error.HTTPError(
-            req.full_url, 400, "Bad Request", {}, fp
-        )
+        raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, fp)
 
     monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_stale)
 

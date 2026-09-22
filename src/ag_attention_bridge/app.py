@@ -1,15 +1,20 @@
-
 """Main application entry point for Ag Attention Bridge daemon."""
 
 from __future__ import annotations
 
-import fcntl
 import logging
 import os
 import signal
 import sys
+from typing import Any
+
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore[assignment]
 
 from ag_attention_bridge.config import get_xdg_runtime_dir, get_xdg_state_dir
 from ag_attention_bridge.domain.models import InteractionRequest
@@ -30,10 +35,12 @@ def setup_logging() -> None:
 
 def acquire_instance_lock() -> int | None:
     """Acquire exclusive single-instance lock file. Returns fd if acquired, None if another instance runs."""
+    if fcntl is None:
+        return 1
     lock_path = get_xdg_runtime_dir() / "ag-attention-bridge.lock"
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
         return fd
     except (BlockingIOError, OSError):
         return None
@@ -41,6 +48,7 @@ def acquire_instance_lock() -> int | None:
 
 def handle_signals(app: QApplication, server: IpcServer | None = None) -> None:
     """Allow Python signal handlers (SIGINT, SIGTERM) to interrupt Qt loop."""
+
     def _clean_quit():
         if server:
             server.stop()
@@ -53,7 +61,7 @@ def handle_signals(app: QApplication, server: IpcServer | None = None) -> None:
     timer.timeout.connect(lambda: None)  # Wake up Python interpreter
     timer.start(500)
     # Retain reference to prevent garbage collection
-    app._sig_timer = timer  # type: ignore
+    app._sig_timer = timer
 
 
 def main() -> int:
@@ -63,7 +71,9 @@ def main() -> int:
     # Never allow more than 1 daemon process per user desktop session!
     lock_fd = acquire_instance_lock()
     if lock_fd is None:
-        logger.warning("Another instance of Ag Attention Bridge is already running. Exiting redundant instance.")
+        logger.warning(
+            "Another instance of Ag Attention Bridge is already running. Exiting redundant instance."
+        )
         return 0
 
     logger.info("Starting Ag Attention Bridge daemon...")
@@ -71,13 +81,14 @@ def main() -> int:
     # Ensure state directory exists
     get_xdg_state_dir()
 
-    app = QApplication.instance()
-    if app is None:
+    app_instance = QApplication.instance()
+    if isinstance(app_instance, QApplication):
+        app = app_instance
+    else:
         app = QApplication(sys.argv)
-
     app.setApplicationName("ag-attention-bridge")
-    app.setDesktopFileName("ag-attention-bridge")
-    app.setQuitOnLastWindowClosed(False)
+    QApplication.setDesktopFileName("ag-attention-bridge")
+    QApplication.setQuitOnLastWindowClosed(False)
 
     # State stores
     sessions = SessionStore()
@@ -85,6 +96,7 @@ def main() -> int:
 
     # Antigravity Native Interaction Resolver
     from ag_attention_bridge.antigravity.interaction_resolver import InteractionResolver
+
     resolver = InteractionResolver()
 
     # Interaction Modal
@@ -163,13 +175,19 @@ def main() -> int:
 
     # Process watcher: auto-shutdown when Antigravity IDE is closed
     import argparse
+
     parser = argparse.ArgumentParser(description="Ag Attention Bridge Daemon")
-    parser.add_argument("--no-watch", action="store_true", help="Disable auto-shutdown when Antigravity exits")
+    parser.add_argument(
+        "--no-watch", action="store_true", help="Disable auto-shutdown when Antigravity exits"
+    )
     args, _ = parser.parse_known_args()
 
     if not args.no_watch:
         from ag_attention_bridge.state.watcher import AntigravityProcessWatcher
-        watcher = AntigravityProcessWatcher(check_interval_ms=10000, max_missing_count=2, parent=app)
+
+        watcher = AntigravityProcessWatcher(
+            check_interval_ms=10000, max_missing_count=2, parent=app
+        )
         watcher.antigravity_exited.connect(app.quit)
         watcher.start()
         app.aboutToQuit.connect(watcher.stop)

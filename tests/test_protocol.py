@@ -1,5 +1,7 @@
 """Unit tests for IPC protocol serialization and message schemas."""
 
+import json
+
 import pytest
 
 from ag_attention_bridge.ipc.protocol import (
@@ -56,5 +58,5 @@ def test_decode_invalid_input():
     with pytest.raises(ValueError):
         decode_payload("   \n\t  ")
 
-    with pytest.raises(Exception):
+    with pytest.raises(json.JSONDecodeError):
         decode_payload(b"NOT_JSON\n")

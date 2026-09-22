@@ -3,6 +3,7 @@
 import os
 import threading
 import time
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -71,7 +72,9 @@ def test_permission_bridge_allow_and_deny(qapp, tmp_path):
     t1.join(timeout=2.0)
     assert allow_result.get("resp") is not None
     assert allow_result["resp"]["data"]["decision"] == "allow"
-    assert allow_result["resp"]["data"].get("permissionOverrides") == ["write_to_file(/tmp/test.py)"]
+    assert allow_result["resp"]["data"].get("permissionOverrides") == [
+        "write_to_file(/tmp/test.py)"
+    ]
 
     # 2. Test Deny
     deny_result = {}
@@ -119,7 +122,7 @@ def test_permission_bridge_allow_and_deny(qapp, tmp_path):
 
 def test_auto_discovery_check_waiting_permission(qapp, tmp_path):
     """Verify CHECK_WAITING triggers background discovery and enqueues PERMISSION interaction."""
-    from ag_attention_bridge.antigravity.models import InteractionType, PermissionScope
+    from ag_attention_bridge.antigravity.models import InteractionType
     from ag_attention_bridge.domain.models import RequestType
 
     socket_path = tmp_path / "test-check-waiting.sock"
@@ -127,7 +130,9 @@ def test_auto_discovery_check_waiting_permission(qapp, tmp_path):
     sessions = SessionStore()
 
     class MockResolver:
-        def resolve_authoritative_waiting_interaction(self, cascade_id, workspace_path=None, max_retries=6):
+        def resolve_authoritative_waiting_interaction(
+            self, cascade_id, workspace_path=None, max_retries=6
+        ):
             return {
                 "trajectory_id": "traj-perm-auto-1",
                 "step_index": 18,
@@ -148,7 +153,7 @@ def test_auto_discovery_check_waiting_permission(qapp, tmp_path):
         conversation_id="conv-auto-perm-1",
         payload={"workspacePaths": ["/home/mashupsoat/Project/polinema-logbook-ai-tools"]},
     )
-    
+
     t = threading.Thread(target=lambda: client.send_and_wait(msg, timeout=5.0))
     t.start()
 
@@ -224,4 +229,3 @@ def test_auto_purge_stale_step_in_same_conversation(qapp, tmp_path):
     assert active.title == "Prepare month"
 
     server.stop()
-

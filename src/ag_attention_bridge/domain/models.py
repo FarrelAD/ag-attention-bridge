@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 
-class RequestType(str, Enum):
+class RequestType(StrEnum):
     QUESTION = "question"
     PERMISSION = "permission"
 
 
-class RequestStatus(str, Enum):
+class RequestStatus(StrEnum):
     RECEIVED = "received"
     PENDING = "pending"
     PRESENTED = "presented"
@@ -21,7 +21,7 @@ class RequestStatus(str, Enum):
     CONSUMED = "consumed"
 
 
-class ToolDecision(str, Enum):
+class ToolDecision(StrEnum):
     ALLOW = "allow"
     DENY = "deny"
     ASK = "ask"
@@ -50,9 +50,7 @@ class HookCommonContext:
 @dataclass
 class HookEventRecord:
     event_type: str
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     pid: int = 0
     context: dict[str, Any] = field(default_factory=dict)
     payload: dict[str, Any] = field(default_factory=dict)
@@ -85,7 +83,7 @@ class QuestionItem:
     allow_custom_input: bool = True
 
 
-class InjectionStatus(str, Enum):
+class InjectionStatus(StrEnum):
     PENDING_INJECTION = "pending_injection"
     CONSUMED = "consumed"
 
@@ -102,9 +100,7 @@ class PendingInjection:
     request_id: str
     status: InjectionStatus = InjectionStatus.PENDING_INJECTION
     items: list[PendingAnswerItem] = field(default_factory=list)
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     continuation_count: int = 0
 
 
@@ -159,9 +155,7 @@ class InteractionRequest:
     allow_custom_input: bool = True
     context_user_message: str | None = None
     context_agent_message: str | None = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     status: RequestStatus = RequestStatus.PENDING
     response_value: Any = None
     permission_overrides: list[str] = field(default_factory=list)
@@ -174,6 +168,7 @@ class InteractionRequest:
     def __post_init__(self) -> None:
         if self.state is None:
             from ag_attention_bridge.antigravity.models import InteractionState
+
             self.state = InteractionState.HOOK_RECEIVED
 
     @property
@@ -183,4 +178,3 @@ class InteractionRequest:
     @interaction_state.setter
     def interaction_state(self, val: Any) -> None:
         self.state = val
-

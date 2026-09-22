@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from pathlib import Path
 import ssl
-from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+from typing import Any
 
 from ag_attention_bridge.antigravity.errors import (
     InteractionStaleError,
@@ -28,7 +27,9 @@ logger = logging.getLogger("ag_attention_bridge.antigravity.client")
 
 # Optional path to local self-signed certificate bundled with Antigravity IDE
 BUNDLED_CERT_CANDIDATES = [
-    Path("/home/mashupsoat/development/clones/Antigravity IDE/resources/app/extensions/antigravity/dist/languageServer/cert.pem"),
+    Path(
+        "/home/mashupsoat/development/clones/Antigravity IDE/resources/app/extensions/antigravity/dist/languageServer/cert.pem"
+    ),
     Path.home() / ".config/antigravity-ide/cert.pem",
 ]
 
@@ -51,7 +52,9 @@ class AntigravityClient:
         parsed = urllib.parse.urlparse(server.base_url)
         host = parsed.hostname
         if host not in ("127.0.0.1", "localhost"):
-            raise SecurityValidationError(f"Target host '{host}' is prohibited. Only localhost is allowed.")
+            raise SecurityValidationError(
+                f"Target host '{host}' is prohibited. Only localhost is allowed."
+            )
 
     def _create_ssl_context(self) -> ssl.SSLContext:
         """Create TLS context tailored for the language server's self-signed certificate."""
@@ -85,7 +88,9 @@ class AntigravityClient:
         )
 
         try:
-            with urllib.request.urlopen(req, context=self._ssl_context, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(
+                req, context=self._ssl_context, timeout=self.timeout
+            ) as resp:
                 resp_bytes = resp.read()
                 if not resp_bytes:
                     return {}
@@ -94,9 +99,15 @@ class AntigravityClient:
             body = e.read().decode("utf-8", errors="replace")
             logger.warning("RPC %s failed with HTTP %d: %s", method, e.code, body)
             # Detect stale interaction signals from Go language server
-            if "input not registered" in body or "run state not found" in body or "step not found" in body:
+            if (
+                "input not registered" in body
+                or "run state not found" in body
+                or "step not found" in body
+            ):
                 raise InteractionStaleError(f"Interaction is stale: {body}") from e
-            raise InteractionSubmissionError(f"RPC {method} failed with code {e.code}: {body}") from e
+            raise InteractionSubmissionError(
+                f"RPC {method} failed with code {e.code}: {body}"
+            ) from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             logger.error("Connection error to %s: %s", url, e)
             raise ServerConnectionError(f"Failed to connect to Language Server: {e}") from e
@@ -105,19 +116,29 @@ class AntigravityClient:
         """Verify server responsiveness."""
         return self.call_rpc("Heartbeat")
 
-    def get_cascade_trajectory(self, cascade_id: str, disable_rehydration: bool = False) -> dict[str, Any]:
+    def get_cascade_trajectory(
+        self, cascade_id: str, disable_rehydration: bool = False
+    ) -> dict[str, Any]:
         """Retrieve full trajectory for a conversation."""
-        return self.call_rpc("GetCascadeTrajectory", {
-            "cascadeId": cascade_id,
-            "disableRehydration": disable_rehydration,
-        })
+        return self.call_rpc(
+            "GetCascadeTrajectory",
+            {
+                "cascadeId": cascade_id,
+                "disableRehydration": disable_rehydration,
+            },
+        )
 
-    def get_cascade_trajectory_steps(self, cascade_id: str, step_offset: int = 0) -> list[dict[str, Any]]:
+    def get_cascade_trajectory_steps(
+        self, cascade_id: str, step_offset: int = 0
+    ) -> list[dict[str, Any]]:
         """Retrieve slice of steps starting from step_offset."""
-        res = self.call_rpc("GetCascadeTrajectorySteps", {
-            "cascadeId": cascade_id,
-            "stepOffset": step_offset,
-        })
+        res = self.call_rpc(
+            "GetCascadeTrajectorySteps",
+            {
+                "cascadeId": cascade_id,
+                "stepOffset": step_offset,
+            },
+        )
         return res.get("steps", [])
 
     def search_conversations(self, query: str = "") -> list[dict[str, Any]]:
@@ -125,12 +146,17 @@ class AntigravityClient:
         res = self.call_rpc("SearchConversations", {"query": query})
         return res.get("results", [])
 
-    def handle_cascade_user_interaction(self, cascade_id: str, interaction: dict[str, Any]) -> dict[str, Any]:
+    def handle_cascade_user_interaction(
+        self, cascade_id: str, interaction: dict[str, Any]
+    ) -> dict[str, Any]:
         """Submit native user interaction response directly to Antigravity."""
-        return self.call_rpc("HandleCascadeUserInteraction", {
-            "cascadeId": cascade_id,
-            "interaction": interaction,
-        })
+        return self.call_rpc(
+            "HandleCascadeUserInteraction",
+            {
+                "cascadeId": cascade_id,
+                "interaction": interaction,
+            },
+        )
 
     def find_waiting_interaction(
         self,
@@ -163,12 +189,15 @@ class AntigravityClient:
                         # Skip steps that have already been answered/completed
                         continue
 
-                    has_requested = "requestedInteraction" in step or "requested_interaction" in step
+                    has_requested = (
+                        "requestedInteraction" in step or "requested_interaction" in step
+                    )
                     step_type = str(step.get("type", ""))
 
                     # 1. Match active uncompleted step with requestedInteraction (authoritative)
                     if has_requested:
                         from ag_attention_bridge.config import log_native_diagnostic
+
                         log_native_diagnostic(
                             "WAITING_STEP_FOUND",
                             conversation_id=cascade_id,
@@ -181,6 +210,7 @@ class AntigravityClient:
                     # 2. Match active uncompleted step in WAITING status (e.g. permission prompts)
                     if "WAITING" in status:
                         from ag_attention_bridge.config import log_native_diagnostic
+
                         log_native_diagnostic(
                             "WAITING_STEP_FOUND",
                             conversation_id=cascade_id,

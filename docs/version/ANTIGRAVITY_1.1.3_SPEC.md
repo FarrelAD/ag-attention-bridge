@@ -129,7 +129,7 @@ In Antigravity 1.1.3:
   "interaction": {
     "trajectoryId": "<uuid>",
     "stepIndex": <int>,
-    
+
     // Oneof: askQuestion OR permission
     "askQuestion": {
       "responses": [
@@ -146,7 +146,7 @@ In Antigravity 1.1.3:
       ],
       "cancelled": <bool>
     },
-    
+
     "permission": {
       "allow": <bool>,
       "scope": "<PermissionScope_enum_string>",

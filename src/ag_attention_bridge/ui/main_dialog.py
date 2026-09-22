@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import time
+from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -271,7 +271,9 @@ class InteractionModal(QDialog):
                 self.lbl_status.setText("")
                 if request.request_type == RequestType.PERMISSION:
                     self.btn_submit.setFocus()
-                elif hasattr(self._content_widget, "set_initial_focus"):
+                elif self._content_widget is not None and hasattr(
+                    self._content_widget, "set_initial_focus"
+                ):
                     self._content_widget.set_initial_focus()
                 else:
                     self.btn_submit.setFocus()
@@ -288,7 +290,9 @@ class InteractionModal(QDialog):
             self._set_buttons_enabled(True)
             if request.request_type == RequestType.PERMISSION:
                 self.btn_submit.setFocus()
-            elif hasattr(self._content_widget, "set_initial_focus"):
+            elif self._content_widget is not None and hasattr(
+                self._content_widget, "set_initial_focus"
+            ):
                 self._content_widget.set_initial_focus()
             else:
                 self.btn_submit.setFocus()
@@ -299,14 +303,13 @@ class InteractionModal(QDialog):
 
         def _worker(req_id: str, cascade_id: str, ws_path: str | None) -> None:
             try:
-                res = self.resolver.resolve_authoritative_waiting_interaction(
+                result = self.resolver.resolve_authoritative_waiting_interaction(
                     cascade_id=cascade_id,
                     workspace_path=ws_path,
-                    max_retries=10,
                 )
-                self.native_step_resolved.emit(req_id, res)
+                self.native_step_resolved.emit(req_id, result)
             except Exception as e:
-                logger.warning("Failed in background resolution worker: %s", e)
+                logger.error("Failed to resolve native step for request %s: %s", req_id, e)
                 self.native_step_resolved.emit(req_id, None)
 
         t = threading.Thread(
@@ -316,19 +319,23 @@ class InteractionModal(QDialog):
         )
         t.start()
 
-    def _on_native_step_resolved(self, req_id: str, resolved_data: Any) -> None:
-        """Main thread callback when background resolution finishes."""
+    def _on_native_step_resolved(self, req_id: str, resolved_result: Any) -> None:
+        """Slot invoked on Qt UI thread once the background worker finishes."""
         if not self.current_request or self.current_request.request_id != req_id:
+            logger.debug("Discarding native step resolution for inactive request %s", req_id)
             return
 
-        if not resolved_data:
+        if resolved_result is None:
+            logger.warning("Could not automatically resolve native step for %s", req_id)
+            self.lbl_status.setText("Antigravity process not detected yet")
             self.current_request.state = InteractionState.FAILED
-            self.lbl_status.setText("Waiting step not found. Press Submit to retry.")
-            self.btn_submit.setEnabled(True)
-            self.btn_deny.setEnabled(True)
-            self.btn_allow_conversation.setEnabled(True)
+            self._set_buttons_enabled(True)
+            self.btn_submit.setText("Retry")
+            self.btn_submit.setFocus()
             return
 
+        resolved_data = resolved_result
+        self.btn_submit.setText("Submit")
         self.current_request.trajectory_id = resolved_data.get("trajectory_id")
         self.current_request.step_index = resolved_data.get("step_index")
 
@@ -338,8 +345,7 @@ class InteractionModal(QDialog):
                 updated_items = []
                 for idx, nq in enumerate(native_questions):
                     native_opts = [
-                        InteractionOption(id=opt.id, label=opt.text)
-                        for opt in nq.options
+                        InteractionOption(id=opt.id, label=opt.text) for opt in nq.options
                     ]
                     updated_items.append(
                         QuestionItem(
@@ -364,7 +370,9 @@ class InteractionModal(QDialog):
 
         if self.current_request.request_type == RequestType.PERMISSION:
             self.btn_submit.setFocus()
-        elif hasattr(self._content_widget, "set_initial_focus"):
+        elif self._content_widget is not None and hasattr(
+            self._content_widget, "set_initial_focus"
+        ):
             self._content_widget.set_initial_focus()
         else:
             self.btn_submit.setFocus()
@@ -396,7 +404,9 @@ class InteractionModal(QDialog):
 
         # STRICT REQUIREMENT: Enter/Submit only accepted on NATIVE_WAITING_READY
         if interaction.state != InteractionState.NATIVE_WAITING_READY:
-            logger.warning("Ignoring submit: native interaction is not ready (state: %s)", interaction.state)
+            logger.warning(
+                "Ignoring submit: native interaction is not ready (state: %s)", interaction.state
+            )
             if interaction.state == InteractionState.FAILED:
                 # Retry on Enter if in FAILED state
                 interaction.state = InteractionState.RESOLVING_NATIVE_STEP
@@ -422,6 +432,7 @@ class InteractionModal(QDialog):
                 from ag_attention_bridge.antigravity.models import PermissionScope
 
                 scope = permission_scope or PermissionScope.PERMISSION_SCOPE_ONCE
+                resp_val: Any
                 if is_perm:
                     allow = action_type != "deny"
                     self.resolver.submit_interaction(
@@ -460,6 +471,7 @@ class InteractionModal(QDialog):
 
             except Exception as e:
                 from ag_attention_bridge.antigravity.errors import InteractionStaleError
+
                 if isinstance(e, InteractionStaleError):
                     interaction.state = InteractionState.STALE
                     self.lbl_status.setText("Interaction is stale or already answered.")
@@ -474,6 +486,7 @@ class InteractionModal(QDialog):
                     return
 
         # Fallback / standalone mode without resolver attached
+        val: Any
         if is_perm:
             val = "deny" if action_type == "deny" else "allow"
         else:
@@ -493,14 +506,12 @@ class InteractionModal(QDialog):
         self.submit_current_interaction(action_type="deny")
 
     def _on_allow_conversation_clicked(self) -> None:
-        from ag_attention_bridge.antigravity.models import PermissionScope
         self.submit_current_interaction(
             action_type="allow",
             permission_scope=PermissionScope.PERMISSION_SCOPE_CONVERSATION,
         )
 
     def _on_allow_global_clicked(self) -> None:
-        from ag_attention_bridge.antigravity.models import PermissionScope
         self.submit_current_interaction(
             action_type="allow",
             permission_scope=PermissionScope.PERMISSION_SCOPE_GLOBAL,

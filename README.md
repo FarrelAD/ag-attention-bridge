@@ -184,12 +184,28 @@ To port Ag Attention Bridge to macOS:
 
 ## 5. Development & Testing
 
-### Running Tests
-The project includes an extensive test suite covering IPC serialization, process discovery, ConnectRPC client transport, idempotency guards, and UI event flows:
+### Running Tests & Code Quality Checks
+The project uses **Ruff** for formatting and linting, **Mypy** for static type checking, and **pytest** for automated tests:
 
 ```bash
-# Run full test suite (63 unit and integration tests)
-.venv/bin/pytest -v
+# Run linter
+ruff check src tests
+
+# Run formatter check (or 'ruff format src tests' to format)
+ruff format --check src tests
+
+# Run static type checker
+mypy src
+
+# Run test suite with coverage
+pytest --cov=ag_attention_bridge --cov-report=term-missing
+
+# Set up pre-commit hooks
+pre-commit install
+
+# Or run all quality checks at once:
+bash scripts/check.sh       # On Linux / macOS
+scripts\check.bat           # On Windows
 ```
 
 ### Standalone CLI Interaction Test

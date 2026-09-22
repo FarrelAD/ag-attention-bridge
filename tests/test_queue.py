@@ -1,7 +1,5 @@
 """Unit tests for RequestQueue and SessionStore."""
 
-import pytest
-
 from ag_attention_bridge.domain.models import (
     InteractionOption,
     InteractionRequest,

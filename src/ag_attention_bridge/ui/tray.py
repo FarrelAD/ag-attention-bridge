@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QUrl
 from PySide6.QtGui import (
@@ -162,9 +161,7 @@ class AttentionTrayIcon(QSystemTrayIcon):
         self.setToolTip(tip)
 
         if hasattr(self, "action_pending"):
-            self.action_pending.setText(
-                f"Open Pending Requests ({self._pending_count})"
-            )
+            self.action_pending.setText(f"Open Pending Requests ({self._pending_count})")
 
     @property
     def pending_count(self) -> int:

@@ -5,9 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any
 
-from ag_attention_bridge.antigravity.errors import ServerNotFoundError
 from ag_attention_bridge.antigravity.models import AntigravityServer
 
 logger = logging.getLogger("ag_attention_bridge.antigravity.discovery")
@@ -17,7 +15,7 @@ def workspace_id_to_path(workspace_id: str) -> str | None:
     """Convert a file_ prefix workspace_id to an absolute path if applicable."""
     if workspace_id.startswith("file_"):
         # e.g. file_home_mashupsoat_development_ag_attention_bridge
-        stripped = workspace_id[len("file_"):]
+        stripped = workspace_id[len("file_") :]
         candidate = "/" + stripped.replace("_", "/")
         # Also try direct replacement of first segments if path exists
         if os.path.exists(candidate):
@@ -68,7 +66,7 @@ class AntigravityDiscovery:
         try:
             os.kill(pid, 0)
             return True
-        except (ProcessLookupError, PermissionError):
+        except (ProcessLookupError, PermissionError, OSError):
             return False
 
     def invalidate_cache(self) -> None:
@@ -81,8 +79,14 @@ class AntigravityDiscovery:
         try:
             # Security: Validate process owner is current user
             stat_info = proc_path.stat()
-            if stat_info.st_uid != os.getuid():
-                logger.debug("Rejecting PID %d: Process owner UID %d does not match current UID %d", pid, stat_info.st_uid, os.getuid())
+            current_uid = os.getuid() if hasattr(os, "getuid") else 1000
+            if stat_info.st_uid != current_uid:
+                logger.debug(
+                    "Rejecting PID %d: Process owner UID %d does not match current UID %d",
+                    pid,
+                    stat_info.st_uid,
+                    current_uid,
+                )
                 return None
 
             cmdline_path = proc_path / "cmdline"
@@ -113,8 +117,14 @@ class AntigravityDiscovery:
             if not https_port:
                 return None
 
-            lsp_port = int(args["lsp_port"]) if "lsp_port" in args and args["lsp_port"].isdigit() else None
-            ext_port = int(args["extension_server_port"]) if "extension_server_port" in args and args["extension_server_port"].isdigit() else None
+            lsp_port = (
+                int(args["lsp_port"]) if "lsp_port" in args and args["lsp_port"].isdigit() else None
+            )
+            ext_port = (
+                int(args["extension_server_port"])
+                if "extension_server_port" in args and args["extension_server_port"].isdigit()
+                else None
+            )
             ws_path = workspace_id_to_path(workspace_id)
 
             server = AntigravityServer(
@@ -161,7 +171,7 @@ class AntigravityDiscovery:
             if not net_path.exists():
                 continue
             try:
-                with open(net_path, "r", encoding="utf-8") as f:
+                with open(net_path, encoding="utf-8") as f:
                     lines = f.readlines()[1:]
                 for line in lines:
                     parts = line.strip().split()
@@ -214,10 +224,7 @@ class AntigravityDiscovery:
             return servers
 
         try:
-            pids = [
-                int(p.name) for p in self.proc_dir.iterdir()
-                if p.is_dir() and p.name.isdigit()
-            ]
+            pids = [int(p.name) for p in self.proc_dir.iterdir() if p.is_dir() and p.name.isdigit()]
         except (PermissionError, OSError):
             return servers
 
@@ -226,7 +233,12 @@ class AntigravityDiscovery:
             if server:
                 servers.append(server)
                 self._server_cache[pid] = server
-                logger.debug("Discovered Antigravity Server: PID %d, Port %d, Token %s", pid, server.https_port, server.masked_csrf_token)
+                logger.debug(
+                    "Discovered Antigravity Server: PID %d, Port %d, Token %s",
+                    pid,
+                    server.https_port,
+                    server.masked_csrf_token,
+                )
 
         return servers
 
@@ -241,7 +253,9 @@ class AntigravityDiscovery:
             if server.workspace_path and os.path.realpath(server.workspace_path) == clean_path:
                 return server
             # Check workspace_id prefix match
-            if server.workspace_id.startswith(expected_prefix) or expected_prefix.startswith(server.workspace_id):
+            if server.workspace_id.startswith(expected_prefix) or expected_prefix.startswith(
+                server.workspace_id
+            ):
                 return server
             # Check name fuzzy match
             if Path(clean_path).name.replace("-", "_") in server.workspace_id:

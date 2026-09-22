@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from typing import Any
@@ -15,9 +14,9 @@ from ag_attention_bridge.antigravity.errors import (
     ServerNotFoundError,
 )
 from ag_attention_bridge.antigravity.models import (
-    PendingInteraction,
     PermissionScope,
     QuestionEntry,
+    QuestionOption,
     SubmissionState,
 )
 
@@ -43,7 +42,9 @@ class InteractionResolver:
     def get_state(self, cascade_id: str, trajectory_id: str, step_index: int) -> SubmissionState:
         """Get the current submission state for an interaction."""
         with self._lock:
-            return self._state_map.get((cascade_id, trajectory_id, step_index), SubmissionState.HOOK_RECEIVED)
+            return self._state_map.get(
+                (cascade_id, trajectory_id, step_index), SubmissionState.HOOK_RECEIVED
+            )
 
     def _get_client_for_workspace(self, workspace_path: str | None = None) -> AntigravityClient:
         """Locate or reuse AntigravityClient for the target workspace."""
@@ -64,7 +65,9 @@ class InteractionResolver:
         self._client_cache[server.pid] = client
         return client
 
-    def _get_client_for_cascade(self, cascade_id: str, workspace_path: str | None = None) -> AntigravityClient:
+    def _get_client_for_cascade(
+        self, cascade_id: str, workspace_path: str | None = None
+    ) -> AntigravityClient:
         """Locate the exact AntigravityClient that hosts the given cascade/conversation.
 
         When multiple Language Server processes exist (across multiple workspace windows,
@@ -99,7 +102,8 @@ class InteractionResolver:
                         if steps:
                             for st in steps[-5:]:
                                 if not st.get("completedInteractions") and (
-                                    st.get("requestedInteraction") or "WAITING" in str(st.get("status", ""))
+                                    st.get("requestedInteraction")
+                                    or "WAITING" in str(st.get("status", ""))
                                 ):
                                     has_waiting = True
                                     break
@@ -126,7 +130,8 @@ class InteractionResolver:
                 self._client_cache.pop(pid, None)
                 # Also remove any active cascade mapping pointing to this pid
                 stale_cascades = [
-                    cid for cid, client in self._active_cascade_client.items()
+                    cid
+                    for cid, client in self._active_cascade_client.items()
                     if client.server.pid == pid
                 ]
                 for cid in stale_cascades:
@@ -163,18 +168,21 @@ class InteractionResolver:
         max_retries: int = 10,
     ) -> dict[str, Any] | None:
         """Fetch authoritative native options/parameters directly from language server WAITING step."""
-        from ag_attention_bridge.config import log_native_diagnostic
         from ag_attention_bridge.antigravity.models import InteractionType, QuestionOption
+        from ag_attention_bridge.config import log_native_diagnostic
 
-        waiting = self.resolve_waiting_step(cascade_id, workspace_path=workspace_path, max_retries=max_retries)
+        waiting = self.resolve_waiting_step(
+            cascade_id, workspace_path=workspace_path, max_retries=max_retries
+        )
         if not waiting:
             log_native_diagnostic("WAITING_STEP_NOT_FOUND", conversation_id=cascade_id)
             return None
 
         trajectory_id, step_index, step_data = waiting
-        step_type = str(step_data.get("type", ""))
 
-        req_int = step_data.get("requestedInteraction") or step_data.get("requested_interaction") or {}
+        req_int = (
+            step_data.get("requestedInteraction") or step_data.get("requested_interaction") or {}
+        )
         ask_q = (
             req_int.get("askQuestion")
             or req_int.get("ask_question")
@@ -187,6 +195,7 @@ class InteractionResolver:
             meta_tc = step_data.get("metadata", {}).get("toolCall", {})
             if meta_tc.get("name") in ("ask_question", "default_api:ask_question"):
                 import json
+
                 args = meta_tc.get("argumentsJson")
                 if isinstance(args, str):
                     try:
@@ -204,6 +213,7 @@ class InteractionResolver:
             for tc in pr.get("toolCalls", []):
                 if tc.get("name") in ("ask_question", "default_api:ask_question"):
                     import json
+
                     args = tc.get("argumentsJson")
                     if isinstance(args, str):
                         try:
@@ -218,6 +228,7 @@ class InteractionResolver:
 
         if not ask_q and "generic" in step_data:
             import json
+
             g_args = step_data.get("generic", {}).get("args", {})
             if isinstance(g_args, str):
                 try:
@@ -256,7 +267,11 @@ class InteractionResolver:
                         # String option: Antigravity wDi() maps index to "1", "2", "3", ...
                         opts.append(QuestionOption(id=str(opt_idx + 1), text=str(opt)))
 
-                is_multi = bool(q_dict.get("isMultiSelect") or q_dict.get("is_multi_select") or q_dict.get("IsMultiSelect"))
+                is_multi = bool(
+                    q_dict.get("isMultiSelect")
+                    or q_dict.get("is_multi_select")
+                    or q_dict.get("IsMultiSelect")
+                )
                 # Default selection is the first native option ID
                 default_selected = [opts[0].id] if opts and not is_multi else []
                 parsed_questions.append(
@@ -288,16 +303,27 @@ class InteractionResolver:
             }
         else:
             perm_dict = perm if isinstance(perm, dict) else {}
-            res_dict = perm_dict.get("resource", {}) if isinstance(perm_dict.get("resource"), dict) else {}
-            action = res_dict.get("action") or ("run_command" if "runCommand" in step_data else "permission")
-            target = res_dict.get("target") or step_data.get("runCommand", {}).get("commandLine", "")
+            res_dict = (
+                perm_dict.get("resource", {}) if isinstance(perm_dict.get("resource"), dict) else {}
+            )
+            action = res_dict.get("action") or (
+                "run_command" if "runCommand" in step_data else "permission"
+            )
+            target = res_dict.get("target") or step_data.get("runCommand", {}).get(
+                "commandLine", ""
+            )
             if not target:
                 meta_tc = step_data.get("metadata", {}).get("toolCall", {})
                 args_raw = meta_tc.get("argumentsJson")
                 if isinstance(args_raw, str):
                     try:
                         args = json.loads(args_raw)
-                        target = args.get("CommandLine") or args.get("TargetFile") or args.get("Command") or ""
+                        target = (
+                            args.get("CommandLine")
+                            or args.get("TargetFile")
+                            or args.get("Command")
+                            or ""
+                        )
                     except Exception:
                         pass
                 elif isinstance(args_raw, dict):
@@ -354,7 +380,9 @@ class InteractionResolver:
                     if conv.get("needsAttention"):
                         cid = conv.get("cascadeId")
                         if cid:
-                            resolved = self.resolve_authoritative_waiting_interaction(cid, max_retries=2)
+                            resolved = self.resolve_authoritative_waiting_interaction(
+                                cid, max_retries=2
+                            )
                             if resolved:
                                 ws_name = (
                                     conv.get("workspaceName")
@@ -385,7 +413,9 @@ class InteractionResolver:
         with self._lock:
             current_state = self._state_map.get(key, SubmissionState.HOOK_RECEIVED)
             if current_state in (SubmissionState.SUBMITTING, SubmissionState.SUBMITTED):
-                logger.warning("Duplicate submission ignored for %s (current state: %s)", key, current_state)
+                logger.warning(
+                    "Duplicate submission ignored for %s (current state: %s)", key, current_state
+                )
                 return False
             self._state_map[key] = SubmissionState.SUBMITTING
 
@@ -461,7 +491,9 @@ class InteractionResolver:
         with self._lock:
             current_state = self._state_map.get(key, SubmissionState.HOOK_RECEIVED)
             if current_state in (SubmissionState.SUBMITTING, SubmissionState.SUBMITTED):
-                logger.warning("Duplicate submission ignored for %s (current state: %s)", key, current_state)
+                logger.warning(
+                    "Duplicate submission ignored for %s (current state: %s)", key, current_state
+                )
                 return False
             self._state_map[key] = SubmissionState.SUBMITTING
 
@@ -543,7 +575,9 @@ class InteractionResolver:
 
         # Auto-resolve trajectory_id and step_index if not supplied
         if not trajectory_id or step_index is None:
-            resolved = self.resolve_authoritative_waiting_interaction(cascade_id, workspace_path=workspace_path, max_retries=6)
+            resolved = self.resolve_authoritative_waiting_interaction(
+                cascade_id, workspace_path=workspace_path, max_retries=6
+            )
             if resolved:
                 trajectory_id = resolved["trajectory_id"]
                 step_index = resolved["step_index"]
@@ -583,16 +617,27 @@ class InteractionResolver:
                         entries.append(item)
                     elif isinstance(item, dict):
                         # Convert dict to QuestionEntry
+                        raw_options = item.get("options") or []
+                        raw_selected = (
+                            item.get("selectedOptionIds") or item.get("selected_option_ids") or []
+                        )
                         entries.append(
                             QuestionEntry(
                                 question=item.get("question", ""),
                                 options=[
-                                    QuestionOption(id=str(o.get("id", idx)), text=str(o.get("text", o.get("label", ""))))
-                                    for idx, o in enumerate(item.get("options", []))
+                                    QuestionOption(
+                                        id=str(o.get("id", idx)),
+                                        text=str(o.get("text", o.get("label", ""))),
+                                    )
+                                    for idx, o in enumerate(raw_options)
                                 ],
-                                is_multi_select=bool(item.get("isMultiSelect", item.get("is_multi_select", False))),
-                                selected_option_ids=[str(sid) for sid in item.get("selectedOptionIds", item.get("selected_option_ids", []))],
-                                write_in_response=str(item.get("writeInResponse", item.get("write_in_response", ""))),
+                                is_multi_select=bool(
+                                    item.get("isMultiSelect", item.get("is_multi_select", False))
+                                ),
+                                selected_option_ids=[str(sid) for sid in raw_selected],
+                                write_in_response=str(
+                                    item.get("writeInResponse", item.get("write_in_response", ""))
+                                ),
                                 skipped=bool(item.get("skipped", False)),
                             )
                         )

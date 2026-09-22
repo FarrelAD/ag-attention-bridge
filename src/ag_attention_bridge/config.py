@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC
 from pathlib import Path
 
 
@@ -65,11 +66,11 @@ def log_bridge_diagnostic(
     exit_code: int | None = None,
 ) -> None:
     """Log structured diagnostic line for Phase 11 tracking."""
-    from datetime import datetime, timezone
     import json
     import sys
+    from datetime import datetime
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     req_str = f"[{request_id}]" if request_id else "[-]"
     conv_str = f"[{conversation_id[:8]}...]" if conversation_id else "[-]"
 
@@ -113,10 +114,10 @@ def log_native_diagnostic(
     extra: str | None = None,
 ) -> None:
     """Log structured diagnostic line for native interaction lifecycle."""
-    from datetime import datetime, timezone
     import sys
+    from datetime import datetime
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
     conv_short = conversation_id[:8] if conversation_id else "unknown"
     traj_short = trajectory_id[:8] if trajectory_id else "unknown"
 
@@ -142,4 +143,3 @@ def log_native_diagnostic(
         pass
 
     sys.stderr.write(f"[ag-native] {ts} {line}\n")
-

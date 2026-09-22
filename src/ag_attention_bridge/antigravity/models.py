@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 
-class PermissionScope(str, Enum):
+class PermissionScope(StrEnum):
     """Native Antigravity permission scopes matching exa.cortex_pb.PermissionScope."""
+
     PERMISSION_SCOPE_UNSPECIFIED = "PERMISSION_SCOPE_UNSPECIFIED"
     PERMISSION_SCOPE_ONCE = "PERMISSION_SCOPE_ONCE"
     PERMISSION_SCOPE_CONVERSATION = "PERMISSION_SCOPE_CONVERSATION"
@@ -18,8 +19,9 @@ class PermissionScope(str, Enum):
     PERMISSION_SCOPE_PROJECT = "PERMISSION_SCOPE_PROJECT"
 
 
-class InteractionType(str, Enum):
+class InteractionType(StrEnum):
     """Categorization of native Antigravity interaction types."""
+
     ASK_QUESTION = "ask_question"
     PERMISSION = "permission"
     RUN_COMMAND = "run_command"
@@ -27,8 +29,9 @@ class InteractionType(str, Enum):
     APPROVAL = "approval_interaction"
 
 
-class InteractionState(str, Enum):
+class InteractionState(StrEnum):
     """Lifecycle state machine for native Antigravity interaction."""
+
     HOOK_RECEIVED = "HOOK_RECEIVED"
     RESOLVING_NATIVE_STEP = "RESOLVING_NATIVE_STEP"
     NATIVE_WAITING_READY = "NATIVE_WAITING_READY"
@@ -48,6 +51,7 @@ SubmissionState = InteractionState
 @dataclass
 class AntigravityServer:
     """Discovered Antigravity Language Server process metadata."""
+
     pid: int
     workspace_id: str
     https_port: int
@@ -74,6 +78,7 @@ class AntigravityServer:
 @dataclass
 class QuestionOption:
     """A selectable option in ask_question with native option ID."""
+
     id: str
     text: str
 
@@ -81,6 +86,7 @@ class QuestionOption:
 @dataclass
 class QuestionEntry:
     """A single question item within ask_question."""
+
     question: str
     options: list[QuestionOption] = field(default_factory=list)
     is_multi_select: bool = False
@@ -103,6 +109,7 @@ class QuestionEntry:
 @dataclass
 class PendingInteraction:
     """Represents a live interaction waiting for user response."""
+
     cascade_id: str
     trajectory_id: str
     step_index: int
@@ -114,9 +121,7 @@ class PendingInteraction:
     permission_reason: str | None = None
     state: InteractionState = InteractionState.HOOK_RECEIVED
     error_message: str | None = None
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     @property
     def identity(self) -> tuple[str, str, int]:

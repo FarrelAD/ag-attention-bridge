@@ -1,12 +1,13 @@
 """Headless tests for UI components: QuestionView, PermissionView, and InteractionModal."""
 
 import os
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent, QKeyEvent
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
 
 from ag_attention_bridge.domain.models import (

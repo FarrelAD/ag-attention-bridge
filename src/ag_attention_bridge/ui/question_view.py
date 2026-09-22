@@ -5,12 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QRadioButton,
@@ -233,10 +231,12 @@ class QuestionView(QWidget):
         result = []
         for section in self._sections:
             selected = section.get_selected()
-            result.append({
-                "question": section.question_item.question,
-                "selected": selected,
-            })
+            result.append(
+                {
+                    "question": section.question_item.question,
+                    "selected": selected,
+                }
+            )
         return result
 
     def get_native_question_entries(self) -> list[QuestionEntry]:

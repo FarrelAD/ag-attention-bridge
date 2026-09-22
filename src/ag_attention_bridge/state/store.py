@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import hashlib
-import json
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
 
 from ag_attention_bridge.domain.models import (
-    InteractionOption,
     InteractionRequest,
     RequestStatus,
-    RequestType,
 )
 
 logger = logging.getLogger("ag_attention_bridge.state")
@@ -189,10 +187,13 @@ class PendingInjectionStore:
         if conv_id not in self._injections:
             self._injections[conv_id] = []
         self._injections[conv_id].append(injection)
-        logger.info("Stored pending injection for conversation %s (req %s)", conv_id, injection.request_id)
+        logger.info(
+            "Stored pending injection for conversation %s (req %s)", conv_id, injection.request_id
+        )
 
     def get_pending(self, conversation_id: str) -> Any | None:
         from ag_attention_bridge.domain.models import InjectionStatus
+
         for inj in self._injections.get(conversation_id, []):
             if inj.status == InjectionStatus.PENDING_INJECTION:
                 return inj
@@ -200,10 +201,15 @@ class PendingInjectionStore:
 
     def consume_pending(self, conversation_id: str) -> Any | None:
         from ag_attention_bridge.domain.models import InjectionStatus
+
         inj = self.get_pending(conversation_id)
         if inj:
             inj.status = InjectionStatus.CONSUMED
-            logger.info("Marked injection consumed for conversation %s (req %s)", conversation_id, inj.request_id)
+            logger.info(
+                "Marked injection consumed for conversation %s (req %s)",
+                conversation_id,
+                inj.request_id,
+            )
             return inj
         return None
 
@@ -229,4 +235,3 @@ class PendingInjectionStore:
             conversation_id,
         )
         return False
-

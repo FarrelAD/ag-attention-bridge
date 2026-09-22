@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
-import pytest
 
 from ag_attention_bridge.antigravity.discovery import AntigravityDiscovery
 from ag_attention_bridge.antigravity.models import AntigravityServer
@@ -12,7 +10,12 @@ from ag_attention_bridge.antigravity.models import AntigravityServer
 
 def test_token_masking():
     """Verify CSRF tokens are always masked and never logged in plain text."""
-    s1 = AntigravityServer(pid=100, workspace_id="ws1", https_port=4000, csrf_token="fc4fc481-1234-5678-90ab-cdef01234567")
+    s1 = AntigravityServer(
+        pid=100,
+        workspace_id="ws1",
+        https_port=4000,
+        csrf_token="fc4fc481-1234-5678-90ab-cdef01234567",
+    )
     assert s1.masked_csrf_token == "fc4f****4567"
     assert "1234-5678" not in s1.masked_csrf_token
 
@@ -50,14 +53,25 @@ def test_parse_proc_cmdline(tmp_path, monkeypatch):
 
     # Mock os.stat so PID ownership matches current user
     orig_stat = os.stat
+
     def mock_stat(path, *args, **kwargs):
         st = orig_stat(path, *args, **kwargs)
-        # return same stat but ensure st_uid == os.getuid()
-        return os.stat_result((
-            st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
-            os.getuid(), st.st_gid, st.st_size,
-            st.st_atime, st.st_mtime, st.st_ctime
-        ))
+        # return same stat but ensure st_uid == current uid (or 1000 on Windows)
+        uid = getattr(os, "getuid", lambda: 1000)()
+        return os.stat_result(
+            (
+                st.st_mode,
+                st.st_ino,
+                st.st_dev,
+                st.st_nlink,
+                uid,
+                st.st_gid,
+                st.st_size,
+                st.st_atime,
+                st.st_mtime,
+                st.st_ctime,
+            )
+        )
 
     monkeypatch.setattr(os, "stat", mock_stat)
 
@@ -84,13 +98,24 @@ def test_process_owner_security_validation(tmp_path, monkeypatch):
 
     # Force stat to report UID of 0 (root) while current user is normal user
     orig_stat = os.stat
+
     def mock_stat_other_user(path, *args, **kwargs):
         st = orig_stat(path, *args, **kwargs)
-        return os.stat_result((
-            st.st_mode, st.st_ino, st.st_dev, st.st_nlink,
-            os.getuid() + 100, st.st_gid, st.st_size,
-            st.st_atime, st.st_mtime, st.st_ctime
-        ))
+        other_uid = getattr(os, "getuid", lambda: 1000)() + 100
+        return os.stat_result(
+            (
+                st.st_mode,
+                st.st_ino,
+                st.st_dev,
+                st.st_nlink,
+                other_uid,
+                st.st_gid,
+                st.st_size,
+                st.st_atime,
+                st.st_mtime,
+                st.st_ctime,
+            )
+        )
 
     monkeypatch.setattr(os, "stat", mock_stat_other_user)
 
@@ -122,7 +147,9 @@ def test_workspace_matching(tmp_path, monkeypatch):
     discovery._cache = [s1, s2]
     monkeypatch.setattr(discovery, "discover_servers", lambda force=False: [s1, s2])
 
-    matched1 = discovery.find_server_for_workspace("/home/mashupsoat/development/ag_attention_bridge")
+    matched1 = discovery.find_server_for_workspace(
+        "/home/mashupsoat/development/ag_attention_bridge"
+    )
     assert matched1 is not None
     assert matched1.pid == 1001
 

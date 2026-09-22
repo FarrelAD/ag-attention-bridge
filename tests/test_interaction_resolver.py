@@ -7,21 +7,21 @@ import pytest
 from ag_attention_bridge.antigravity.errors import (
     InteractionStaleError,
     InteractionSubmissionError,
-    ServerNotFoundError,
 )
 from ag_attention_bridge.antigravity.interaction_resolver import InteractionResolver
 from ag_attention_bridge.antigravity.models import (
     AntigravityServer,
     PermissionScope,
     QuestionEntry,
-    QuestionOption,
     SubmissionState,
 )
 
 
 class MockClient:
     def __init__(self, server=None):
-        self.server = server or AntigravityServer(pid=1, workspace_id="ws", https_port=4000, csrf_token="tok")
+        self.server = server or AntigravityServer(
+            pid=1, workspace_id="ws", https_port=4000, csrf_token="tok"
+        )
         self.submissions = []
         self.should_fail = False
         self.should_be_stale = False
@@ -29,8 +29,19 @@ class MockClient:
     def build_ask_question_payload(self, trajectory_id, step_index, responses, cancelled=False):
         return {"trajectoryId": trajectory_id, "stepIndex": step_index, "askQuestion": {}}
 
-    def build_permission_payload(self, trajectory_id, step_index, allow, scope=PermissionScope.PERMISSION_SCOPE_ONCE, user_deny_instruction=""):
-        return {"trajectoryId": trajectory_id, "stepIndex": step_index, "permission": {"allow": allow}}
+    def build_permission_payload(
+        self,
+        trajectory_id,
+        step_index,
+        allow,
+        scope=PermissionScope.PERMISSION_SCOPE_ONCE,
+        user_deny_instruction="",
+    ):
+        return {
+            "trajectoryId": trajectory_id,
+            "stepIndex": step_index,
+            "permission": {"allow": allow},
+        }
 
     def handle_cascade_user_interaction(self, cascade_id, payload):
         if self.should_be_stale:
@@ -46,7 +57,9 @@ class MockClient:
 
 class MockDiscovery:
     def __init__(self, servers=None):
-        self._servers = servers or [AntigravityServer(pid=1, workspace_id="ws", https_port=4000, csrf_token="tok")]
+        self._servers = servers or [
+            AntigravityServer(pid=1, workspace_id="ws", https_port=4000, csrf_token="tok")
+        ]
 
     def discover_servers(self, force=False):
         return self._servers
@@ -173,9 +186,8 @@ def test_multi_server_candidate_selection_prioritizes_freshest_and_waiting():
     c2.get_cascade_trajectory = lambda cid: {
         "trajectory": {
             "cascadeId": cid,
-            "steps": [{"status": "DONE"} for _ in range(25)] + [
-                {"status": "WAITING", "requestedInteraction": {"askQuestion": {}}}
-            ],
+            "steps": [{"status": "DONE"} for _ in range(25)]
+            + [{"status": "WAITING", "requestedInteraction": {"askQuestion": {}}}],
         }
     }
 
@@ -223,6 +235,3 @@ def test_scan_waiting_interactions():
     assert resolved["permission_action"] == "command"
     assert resolved["permission_target"] == "ls -la"
     assert resolved["permission_reason"] == "List files"
-
-
-

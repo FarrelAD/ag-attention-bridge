@@ -3,6 +3,7 @@
 import os
 import threading
 import time
+
 import pytest
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -99,7 +100,15 @@ def test_question_bridge_bypass_and_preinvocation_injection(qapp, tmp_path, monk
     assert req.title == "Which architecture pattern should we use?"
 
     # Resolve with answer
-    server.resolve_request("q-req-1", [{"question": "Which architecture pattern should we use?", "selected": ["Clean Architecture"]}])
+    server.resolve_request(
+        "q-req-1",
+        [
+            {
+                "question": "Which architecture pattern should we use?",
+                "selected": ["Clean Architecture"],
+            }
+        ],
+    )
     _process_events_until(lambda: bool(client_result.get("resp")), max_iters=30)
 
     t.join(timeout=2.0)
@@ -156,7 +165,11 @@ def test_question_bridge_multi_questions_and_stop_continuation(qapp, tmp_path, m
                     "args": {
                         "questions": [
                             {"question": "Framework?", "options": ["React", "Vue"]},
-                            {"question": "Features?", "options": ["API", "Database"], "is_multi_select": True},
+                            {
+                                "question": "Features?",
+                                "options": ["API", "Database"],
+                                "is_multi_select": True,
+                            },
                         ]
                     },
                 },
@@ -170,10 +183,13 @@ def test_question_bridge_multi_questions_and_stop_continuation(qapp, tmp_path, m
     assert _process_events_until(lambda: queue.count() == 1)
 
     # Resolve with answers to both questions
-    server.resolve_request("q-req-multi", [
-        {"question": "Framework?", "selected": ["Vue"]},
-        {"question": "Features?", "selected": ["API", "Database"]},
-    ])
+    server.resolve_request(
+        "q-req-multi",
+        [
+            {"question": "Framework?", "selected": ["Vue"]},
+            {"question": "Features?", "selected": ["API", "Database"]},
+        ],
+    )
     _process_events_until(lambda: bool(client_result.get("resp")), max_iters=30)
     t.join(timeout=2.0)
 
