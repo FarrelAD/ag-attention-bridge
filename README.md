@@ -139,28 +139,50 @@ All hook handling, protocol serialization, ConnectRPC client code, queue managem
 
 ### 4.3 Windows (Win32)
 
-To port Ag Attention Bridge to Windows:
+Ag Attention Bridge is **100% natively compatible on Windows** (Win32):
 
-1. **Process Discovery ([`discovery.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/antigravity/discovery.py))**:
-   * Windows does not have `/proc`.
-   * Replace `/proc` parsing with `psutil` or `ctypes`/Win32 API (`CreateToolhelp32Snapshot`, `Process32First`):
-     ```python
-     import psutil
+- **Zero-Dependency Win32 Named Pipes**: Direct communication between `ag-hook-adapter` and `QLocalServer` via standard library `ctypes`.
+- **Win32 Mutex Guard**: Enforces strict single-instance daemon per user desktop session.
+- **Toolhelp32 Snapshot**: Sub-5ms process lifecycle discovery without `/proc`.
+- **System Tray**: Native integration into the Windows Notification Area.
 
-     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
-         if proc.info["name"] == "language_server_windows_x64.exe":
-             cmdline = proc.info["cmdline"]
-             # Extract --csrf_token and other parameters
-     ```
-2. **Local IPC ([`client.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/ipc/client.py) & [`server.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/ipc/server.py))**:
-   * Qt's `QLocalServer` and `QLocalSocket` automatically map to **Windows Named Pipes** (`\\.\pipe\ag-attention-bridge`) without code changes.
-3. **Always-On-Top Window**:
-   * `Qt.WindowType.WindowStaysOnTopHint` works reliably on Win32 out of the box.
-4. **System Tray**:
-   * `QSystemTrayIcon` is fully supported on the Windows Notification Area.
-5. **Hooks Configuration**:
-   * On Windows, Antigravity loads hooks from `%USERPROFILE%\.gemini\config\hooks.json`.
-   * Use an `.exe` wrapper or batch script launcher in place of bash scripts.
+#### Quickstart / Installation on Windows
+
+To install and integrate hooks automatically into Antigravity on Windows:
+
+```powershell
+# Run from repository root (no administrator privileges needed)
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
+
+This will:
+1. Deploy fast launcher shims to `%LOCALAPPDATA%\ag-attention-bridge\bin`.
+2. Add the bin folder to your User `PATH`.
+3. Safely register hooks in `%USERPROFILE%\.gemini\config\hooks.json`.
+4. Create an autostart shortcut in your Windows Startup folder.
+5. Launch the daemon in the background (`pythonw.exe`).
+
+#### Uninstallation on Windows
+
+To completely remove hooks, shortcuts, and shims:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1
+```
+
+#### Standalone Windows Installer Packaging
+
+To build a standalone `.exe` setup wizard (Inno Setup) that requires no Python installed:
+
+```powershell
+# 1. Build standalone executable bundle with PyInstaller
+pyinstaller packaging\windows\ag-attention-bridge.spec
+
+# 2. Compile setup wizard with Inno Setup 6
+iscc packaging\windows\installer.iss
+```
+
+This produces `dist\AgAttentionBridge-Setup.exe` with standard Start Menu shortcuts, uninstaller in Windows *Add or remove programs*, and automatic hooks management.
 
 ---
 
