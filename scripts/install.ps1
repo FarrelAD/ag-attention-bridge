@@ -45,6 +45,7 @@ $BridgeCmd = Join-Path $BinDir "ag-attention-bridge.cmd"
 $HookAdapterContent = @"
 @echo off
 setlocal
+set AG_ATTENTION_SYNTHETIC_FALLBACK=1
 "$PythonExe" -m ag_attention_bridge.hooks.adapter %*
 "@
 

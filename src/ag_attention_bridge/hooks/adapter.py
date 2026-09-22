@@ -188,7 +188,19 @@ def ensure_daemon_running(client: IpcClient, timeout: float = 3.0) -> bool:
     return False
 
 
-SYNTHETIC_FALLBACK_ENABLED = os.environ.get("AG_ATTENTION_SYNTHETIC_FALLBACK") == "1"
+SYNTHETIC_FALLBACK_ENABLED: bool | None = None
+
+
+def is_synthetic_fallback_enabled() -> bool:
+    """Return True if synchronous hook fallback is active (default True on Windows)."""
+    global SYNTHETIC_FALLBACK_ENABLED
+    if SYNTHETIC_FALLBACK_ENABLED is not None:
+        return SYNTHETIC_FALLBACK_ENABLED
+    val = os.environ.get("AG_ATTENTION_SYNTHETIC_FALLBACK")
+    if val is not None:
+        return val == "1"
+    # On Windows, CLI is standard and ConnectRPC LanguageServer via /proc is not available
+    return os.name == "nt"
 
 
 def handle_hook(
@@ -227,8 +239,10 @@ def handle_hook(
 
         is_observation_tool = tool_name in ("ask_question", "ask_permission") or not tool_name
 
-        if not SYNTHETIC_FALLBACK_ENABLED and is_observation_tool:
-            # Native Antigravity Interaction Flow (Primary):
+        synthetic_mode = is_synthetic_fallback_enabled()
+
+        if not synthetic_mode and is_observation_tool:
+            # Native Antigravity Interaction Flow (Primary for IDE on Linux):
             # 1. Notify Ag Attention Bridge daemon with conversation/cascade context.
             # 2. Return decision: allow so Language Server executes native tool and enters WAITING.
             if client.is_available():
@@ -260,8 +274,8 @@ def handle_hook(
             write_observation_log(record)
             return response, 0
 
-        # Legacy Synthetic Fallback Path (enabled ONLY when AG_ATTENTION_SYNTHETIC_FALLBACK=1)
-        if not SYNTHETIC_FALLBACK_ENABLED:
+        # Synchronous Hook Modal Path (used on Windows / CLI or when AG_ATTENTION_SYNTHETIC_FALLBACK=1)
+        if not synthetic_mode:
             return generate_default_response(event_type, payload), 0
 
         if not client.is_available():
@@ -302,7 +316,7 @@ def handle_hook(
         )
 
     elif event_type == "PreInvocation":
-        if not SYNTHETIC_FALLBACK_ENABLED:
+        if not is_synthetic_fallback_enabled():
             # Native interaction: do NOT inject synthetic userMessage turns
             response = {}
         elif client.is_available():
@@ -331,7 +345,7 @@ def handle_hook(
             response = {}
 
     elif event_type == "Stop":
-        if not SYNTHETIC_FALLBACK_ENABLED:
+        if not is_synthetic_fallback_enabled():
             response = {}
         elif client.is_available():
             msg = IpcMessage(
