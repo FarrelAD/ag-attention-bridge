@@ -27,15 +27,16 @@ def qapp():
 
 
 def test_ipc_server_lifecycle(qapp, tmp_path):
-    if sys.platform == "win32":
-        pytest.skip("QLocalServer / Unix domain socket files are POSIX-only")
-    socket_path = tmp_path / "test-bridge.sock"
+    socket_path = (
+        "test-bridge-lifecycle" if sys.platform == "win32" else tmp_path / "test-bridge.sock"
+    )
     queue = RequestQueue()
     sessions = SessionStore()
 
     server = IpcServer(queue, sessions, socket_path=socket_path)
     assert server.start() is True
-    assert socket_path.exists()
+    if sys.platform != "win32":
+        assert socket_path.exists()
 
     client = IpcClient(socket_path=socket_path)
     assert client.is_available() is True
@@ -45,9 +46,11 @@ def test_ipc_server_lifecycle(qapp, tmp_path):
 
 
 def test_ipc_submit_and_resolve_roundtrip(qapp, tmp_path):
-    if sys.platform == "win32":
-        pytest.skip("QLocalServer / Unix domain socket files are POSIX-only")
-    socket_path = tmp_path / "test-bridge-roundtrip.sock"
+    socket_path = (
+        "test-bridge-roundtrip"
+        if sys.platform == "win32"
+        else tmp_path / "test-bridge-roundtrip.sock"
+    )
     queue = RequestQueue()
     sessions = SessionStore()
 

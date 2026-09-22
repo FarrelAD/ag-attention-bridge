@@ -9,20 +9,15 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
-# Auto-skip Unix Domain Socket and Linux-specific /proc tests when executed on Windows
+# Tests that strictly require POSIX /proc filesystem if not mocked
+LINUX_PROC_TESTS = {
+    # None currently; all mock discovery or use platform abstraction
+}
+
+
 @pytest.fixture(autouse=True)
 def skip_linux_only_tests_on_windows(request):
     if sys.platform == "win32":
-        # Tests that rely on Unix domain socket files (.sock on filesystem) or /proc
-        linux_only_modules = {
-            "test_ipc",
-            "test_native_flow",
-            "test_permission_bridge",
-            "test_phase_verification",
-            "test_question_bridge",
-            "test_response_flow",
-        }
-        if request.module.__name__.split(".")[-1] in linux_only_modules:
-            pytest.skip(
-                "Linux / KDE Plasma Wayland integration test (requires Unix domain socket file & /proc)"
-            )
+        mod_name = request.module.__name__.split(".")[-1]
+        if mod_name in LINUX_PROC_TESTS:
+            pytest.skip("Test requires Linux /proc filesystem")

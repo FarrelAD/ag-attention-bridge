@@ -33,17 +33,38 @@ def setup_logging() -> None:
     )
 
 
-def acquire_instance_lock() -> int | None:
-    """Acquire exclusive single-instance lock file. Returns fd if acquired, None if another instance runs."""
+def acquire_instance_lock() -> Any:
+    """Acquire exclusive single-instance lock.
+
+    Returns lock handle/fd if acquired, None if another instance is running.
+    """
+    if sys.platform == "win32":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        mutex_name = "Local\\AgAttentionBridge_SingleInstanceMutex"
+        handle = kernel32.CreateMutexW(None, True, mutex_name)
+        last_error = kernel32.GetLastError()
+        # ERROR_ALREADY_EXISTS = 183
+        if last_error == 183 or handle == 0:
+            if handle:
+                kernel32.CloseHandle(handle)
+            return None
+        return handle
+
     if fcntl is None:
         return 1
     lock_path = get_xdg_runtime_dir() / "ag-attention-bridge.lock"
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return fd
     except (BlockingIOError, OSError):
         return None
+
+
+# Retain reference to prevent garbage collection
+_GLOBAL_TIMERS: list[Any] = []
 
 
 def handle_signals(app: QApplication, server: IpcServer | None = None) -> None:
@@ -60,8 +81,7 @@ def handle_signals(app: QApplication, server: IpcServer | None = None) -> None:
     timer = QTimer()
     timer.timeout.connect(lambda: None)  # Wake up Python interpreter
     timer.start(500)
-    # Retain reference to prevent garbage collection
-    app._sig_timer = timer
+    _GLOBAL_TIMERS.append(timer)
 
 
 def main() -> int:

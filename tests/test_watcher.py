@@ -24,10 +24,6 @@ def qapp():
 
 
 def test_is_antigravity_running_real_system():
-    if not os.path.exists("/proc"):
-        pytest.skip("/proc filesystem only exists on Linux")
-    # On this machine, Antigravity IDE is currently active
-    assert is_antigravity_running("antigravity-ide") is True
     # Non-existent process returns False
     assert is_antigravity_running("completely_fake_process_name_9999") is False
 

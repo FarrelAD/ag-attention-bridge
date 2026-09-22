@@ -8,21 +8,27 @@ from pathlib import Path
 
 
 def get_xdg_runtime_dir() -> Path:
-    """Return runtime directory, defaulting to /tmp/ag-bridge-<uid> if unset."""
+    """Return runtime directory, defaulting to %LOCALAPPDATA% on Windows or /tmp on POSIX."""
     xdg_runtime = os.environ.get("XDG_RUNTIME_DIR")
     if xdg_runtime:
         return Path(xdg_runtime)
-    uid = os.getuid() if hasattr(os, "getuid") else 1000
-    path = Path(f"/tmp/ag-bridge-{uid}")
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        path = base / "ag-attention-bridge" / "run"
+    else:
+        uid = os.getuid() if hasattr(os, "getuid") else 1000
+        path = Path(f"/tmp/ag-bridge-{uid}")
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
     return path
 
 
 def get_xdg_state_dir() -> Path:
-    """Return XDG state directory (~/.local/state/ag-attention-bridge)."""
+    """Return state directory (%LOCALAPPDATA% on Windows, ~/.local/state on POSIX)."""
     xdg_state = os.environ.get("XDG_STATE_HOME")
     if xdg_state:
         base = Path(xdg_state)
+    elif os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     else:
         base = Path.home() / ".local" / "state"
     path = base / "ag-attention-bridge"
@@ -30,7 +36,13 @@ def get_xdg_state_dir() -> Path:
     return path
 
 
-SOCKET_PATH = get_xdg_runtime_dir() / "ag-attention-bridge.sock"
+# On Windows, QLocalServer uses Named Pipe "ag-attention-bridge".
+# On POSIX, QLocalServer uses a filesystem socket path.
+SOCKET_PATH = (
+    Path("ag-attention-bridge")
+    if os.name == "nt"
+    else get_xdg_runtime_dir() / "ag-attention-bridge.sock"
+)
 GLOBAL_EVENTS_LOG_PATH = get_xdg_state_dir() / "events.jsonl"
 BRIDGE_LOG_PATH = get_xdg_state_dir() / "bridge.log"
 

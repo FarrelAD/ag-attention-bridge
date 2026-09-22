@@ -146,9 +146,10 @@ To port Ag Attention Bridge to Windows:
    * Replace `/proc` parsing with `psutil` or `ctypes`/Win32 API (`CreateToolhelp32Snapshot`, `Process32First`):
      ```python
      import psutil
-     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-         if proc.info['name'] == 'language_server_windows_x64.exe':
-             cmdline = proc.info['cmdline']
+
+     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+         if proc.info["name"] == "language_server_windows_x64.exe":
+             cmdline = proc.info["cmdline"]
              # Extract --csrf_token and other parameters
      ```
 2. **Local IPC ([`client.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/ipc/client.py) & [`server.py`](file:///home/mashupsoat/development/ag-attention-bridge/src/ag_attention_bridge/ipc/server.py))**:
@@ -175,6 +176,7 @@ To port Ag Attention Bridge to macOS:
    * `Qt.WindowStaysOnTopHint` works out of the box. For strict overlay behavior over full-screen apps, use PyObjC:
      ```python
      from AppKit import NSFloatingWindowLevel
+
      ns_window.setLevel_(NSFloatingWindowLevel)
      ```
 4. **Hooks Path**:

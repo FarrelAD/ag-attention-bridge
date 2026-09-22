@@ -74,9 +74,9 @@ class IpcServer(QObject):
         self._poll_timer: Any | None = None
 
     def start(self) -> bool:
-        """Start listening on the local unix socket."""
-        # Clean up stale socket file if it exists
-        if os.path.exists(self.socket_path):
+        """Start listening on the local socket or named pipe."""
+        # On POSIX, clean up stale socket file if it exists
+        if os.name != "nt" and os.path.exists(self.socket_path):
             try:
                 os.unlink(self.socket_path)
             except OSError as e:
@@ -84,8 +84,9 @@ class IpcServer(QObject):
 
         QLocalServer.removeServer(self.socket_path)
 
-        # Ensure parent directory exists with safe permissions
-        Path(self.socket_path).parent.mkdir(parents=True, exist_ok=True)
+        # On POSIX, ensure parent directory exists with safe permissions
+        if os.name != "nt":
+            Path(self.socket_path).parent.mkdir(parents=True, exist_ok=True)
 
         if not self._server.listen(self.socket_path):
             logger.error(
